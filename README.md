@@ -14,27 +14,57 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 
 | Deliverable | Current status | What remains |
 |---|---|---|
-| Dockerized, portable system | Compose defines API, PostgreSQL, and dashboard services; runtime is not verified yet | Add simulator, broker, production secrets, deployment profile, and end-to-end evidence |
-| Real-time ingestion and alerting | Spring API validates and persists events; retries are idempotent | Add Kafka stream processing and explainable fleet alerts with latency evidence |
+| Dockerized, portable system | Local Compose runtime verified for API, PostgreSQL, and dashboard | Add broker and simulator services, deployment profiles, and cloud portability evidence |
+| Real-time ingestion and alerting | API validates and persists idempotent events; sustained-idle alerts have been exercised end to end on the local stack | Add Kafka stream processing and latency evidence at challenge scale |
 | Relational and high-volume data | PostgreSQL telemetry, vehicle state, and alert tables are implemented | Add fleet metadata and a high-volume telemetry store after measuring workload |
-| User interface | Tenant and vehicle filtered alert dashboard with automatic refresh | Add alert acknowledgement and authenticated API access |
-| Security, tests, and observability | Not implemented in this starter | Add tenant-aware access controls, automated checks, metrics/logs/traces, and documented security decisions |
+| User interface | Local dashboard with tenant and vehicle filters and automatic refresh | Add alert acknowledgement and authenticated API access |
+| Security, tests, and observability | Production authentication, authorization, automated test coverage, and full observability are not implemented | Add tenant-aware access controls, automated checks, metrics/logs/traces, and documented security decisions |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
-Docker is part of the deliverable. Compose defines the API, PostgreSQL, dashboard, persistent volume, and database health check, but the full stack is not runtime-verified or cloud-portable until the remaining services are added and exercised together.
+Docker is part of the deliverable. Compose defines the API, PostgreSQL, dashboard, persistent volume, and database health check. The local stack and one synthetic alert journey have been verified; this is not a claim of cloud portability or challenge-scale performance.
 
 The simulator accepts 100,000 vehicles. That is a data-generation capability, not a claim that the current API sustains the challenge's 100,000 events/second target.
 
 ## Quick start
 
-Requires Docker and Docker Compose. The application images include their own Java runtime.
+Requires Docker Desktop. You do not need to install Java, Maven, Node.js, Spring Boot, or PostgreSQL on your Mac; Docker downloads and runs the build tools and services inside containers. Docker Compose is included with current Docker Desktop releases.
+
+### Start it on a Mac
+
+1. Open Docker Desktop and wait until it says the engine is running.
+2. Open **Terminal** (press `Command + Space`, type `Terminal`, and press Return).
+3. In Terminal, go to the folder where you downloaded or cloned this repository. For example:
+
+   ```bash
+   cd ~/Projects/Fleet-Intelligence-Platform
+   ```
+
+   Replace that example path with the folder where the repository is on your Mac. If you opened this project only inside Codex, the project files are in Codex's workspace; you do not need to type commands while the app is already running.
+4. Start the system:
+
+   ```bash
+   docker compose up --build
+   ```
+
+5. Open `http://localhost:3000` in a browser. The first build downloads the Java and Node build images and can take several minutes. Leave the Terminal window open while using the app. Press `Control + C` there to stop it.
+
+To start the already-built services in the background later, use `docker compose up -d`. To stop background services, use `docker compose down` from the same repository folder.
+
+The dashboard starts with no alerts because the database is empty. To create a synthetic idling alert for the demo, leave the services running, open a second Terminal window in the repository folder, and run:
+
+```bash
+bash scripts/demo.sh
+```
+
+Then set the dashboard's **Fleet / tenant** field to `tenant-demo`. The script submits two synthetic stationary events six minutes apart; it does not use real vehicle data. The dashboard should show one open idling alert for the demo vehicle.
+
+If you want to change local settings, create the optional environment file before starting Docker:
 
 ```bash
 cp .env.example .env
-docker compose up --build
 ```
 
-The dashboard is available at `http://localhost:3000`; the API is available at `http://localhost:8080`, and readiness is at `/actuator/health/readiness`. Submit a telemetry event to `POST /v1/telemetry`, then read it back with `GET /v1/telemetry?tenant_id=tenant-00&vehicle_id=vehicle-000001` or view its alert at `/v1/alerts?tenant_id=tenant-00`.
+The optional `.env` copy is only needed if you want to customize settings; defaults work for local development. The API is available at `http://localhost:8080`, and readiness is at `/actuator/health/readiness`. Submit a telemetry event to `POST /v1/telemetry`, then read it back with `GET /v1/telemetry?tenant_id=tenant-00&vehicle_id=vehicle-000001` or view its alert at `/v1/alerts?tenant_id=tenant-00`.
 
 Example request:
 

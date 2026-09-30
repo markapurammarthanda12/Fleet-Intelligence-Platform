@@ -80,7 +80,7 @@ public class TelemetryService {
         return jdbcTemplate.query("""
                 SELECT alert_id, tenant_id, vehicle_id, rule_version, severity,
                        episode_started_at, last_observed_at, idle_seconds,
-                       estimated_fuel_litres, status
+                       estimated_fuel_litres, status, resolved_at
                 FROM fleet_alerts
                 WHERE tenant_id = ?
                 ORDER BY last_observed_at DESC
@@ -168,7 +168,7 @@ public class TelemetryService {
                 INSERT INTO fleet_alerts (
                     alert_id, tenant_id, vehicle_id, rule_version, severity,
                     episode_started_at, last_observed_at, idle_seconds,
-                       estimated_fuel_litres, status, resolved_at
+                    estimated_fuel_litres, status
                 ) VALUES (?, ?, ?, 'idle-v1', 'warning', ?, ?, ?, ?, 'open')
                 ON CONFLICT (tenant_id, vehicle_id, rule_version, episode_started_at)
                 DO UPDATE SET last_observed_at = EXCLUDED.last_observed_at,

@@ -34,7 +34,7 @@ Targets are project goals; they are not measured results yet.
 
 - Synthetic location coordinates are generated around Bengaluru and do not represent real vehicles.
 - Fuel burn during idling varies by vehicle and conditions. The default 1.5 litres/hour is an illustrative assumption.
-- A single event cannot establish an idle duration. The current ingestion slice stores events but does not yet calculate idling duration; that rule will be added with event-time and out-of-order behavior documented.
+- A single event cannot establish an idle duration. The current API uses per-vehicle event-time state to open and resolve prolonged-idling alerts; synthetic events have exercised this journey locally. Late events are persisted but do not rewind the current vehicle state.
 - Driver-level attribution is out of scope until privacy, consent, and access requirements are defined.
 
 ## Boundary
