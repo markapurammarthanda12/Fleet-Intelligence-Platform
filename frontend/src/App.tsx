@@ -142,6 +142,7 @@ function downloadCsv(filename: string, headers: string[], rows: Array<Array<stri
 }
 
 export default function App() {
+  const [demoSignedIn, setDemoSignedIn] = useState(() => sessionStorage.getItem("fleet-demo-session") === "active");
   const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1) || "overview");
   const [vehicleFilter, setVehicleFilter] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
@@ -195,10 +196,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!demoSignedIn) return;
     void refresh();
     const timer = window.setInterval(() => void refresh(), 5000);
     return () => window.clearInterval(timer);
-  }, [refresh]);
+  }, [demoSignedIn, refresh]);
 
   useEffect(() => {
     const syncSection = () => setActiveSection(window.location.hash.slice(1) || "overview");
@@ -207,6 +209,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!demoSignedIn) return;
     if (!analyticsFrom || !analyticsTo) return;
     const from = new Date(analyticsFrom);
     const to = new Date(analyticsTo);
@@ -250,7 +253,7 @@ export default function App() {
         if (active) setAnalyticsLoading(false);
       });
     return () => { active = false; };
-  }, [analyticsFrom, analyticsTo]);
+  }, [analyticsFrom, analyticsTo, demoSignedIn]);
 
   useEffect(() => {
     if (!selectedVehicleId) {
@@ -301,6 +304,27 @@ export default function App() {
   const selectedVehicle = vehicles.find((vehicle) => vehicle.vehicle_id === selectedVehicleId) ?? null;
   const selectedVehicleAlerts = alerts.filter((alert) => alert.vehicle_id === selectedVehicleId);
 
+  if (!demoSignedIn) return (
+    <main className="login-page">
+      <section className="login-brand-panel">
+        <a className="login-brand" href="#overview"><span className="brand-mark" aria-hidden="true">↗</span><span><strong>Fleet Intelligence</strong><small>Connected fleets. Clear decisions.</small></span></a>
+        <div className="login-brand-message"><span className="eyebrow">FLEET OPERATIONS PLATFORM</span><h1>Connected vehicles.<br />Smarter decisions.</h1><p>Bring vehicle activity, alerts, and fleet signals into one clear workspace.</p></div>
+        <div className="login-brand-foot">Local demonstration · Synthetic fleet data</div>
+      </section>
+      <section className="login-card-wrap">
+        <div className="login-card panel">
+          <div className="login-mobile-brand"><span className="brand-mark" aria-hidden="true">↗</span><strong>Fleet Intelligence</strong></div>
+          <span className="eyebrow">WELCOME</span>
+          <h2>Open your fleet workspace</h2>
+          <p className="login-copy">Explore the local demo using synthetic vehicle data.</p>
+          <div className="login-demo-note"><strong>Demo sign-in</strong><span>This opens a local demo session on this browser. It does not authenticate a real account or protect private fleet data.</span></div>
+          <button className="login-submit" type="button" onClick={() => { sessionStorage.setItem("fleet-demo-session", "active"); setDemoSignedIn(true); }}>Continue to demo fleet <span aria-hidden="true">→</span></button>
+          <p className="login-footnote">For real organization sign-in, an OIDC provider must be configured.</p>
+        </div>
+      </section>
+    </main>
+  );
+
   return (
     <div className="app-layout">
       <aside className="sidebar" aria-label="Fleet sections">
@@ -329,7 +353,8 @@ export default function App() {
           <label className="global-search"><span aria-hidden="true">⌕</span><span className="sr-only">Search vehicles and alerts</span><input value={globalSearch} onChange={(event) => { setGlobalSearch(event.target.value); setVehicleFilter(event.target.value); setAlertSearch(event.target.value); }} placeholder="Search vehicles, alerts…" /></label>
           <div className="topbar-right">
             <span className="workspace-label">Demo fleet · local</span>
-            <span className="avatar" aria-label="Fleet operator">FO</span>
+            <span className="avatar" aria-label="Demo operator">DO</span>
+            <button className="sign-out-button" type="button" onClick={() => { sessionStorage.removeItem("fleet-demo-session"); setDemoSignedIn(false); }}>Sign out</button>
           </div>
         </header>
 
