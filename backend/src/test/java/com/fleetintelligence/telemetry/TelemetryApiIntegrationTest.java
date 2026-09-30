@@ -182,6 +182,31 @@ class TelemetryApiIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(storedEvents).isZero();
     }
 
+    @Test
+    void fleetOverviewAndVehicleListUseLatestTenantTelemetry() throws Exception {
+        String observedAt = Instant.now().minusSeconds(20).toString();
+        send("overview-moving", "overview-vehicle", observedAt, 42, 1);
+
+        mockMvc.perform(get("/v1/fleet/overview").param("tenant_id", "tenant-demo"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.vehicles_seen").value(1))
+                .andExpect(jsonPath("$.moving_now").value(1))
+                .andExpect(jsonPath("$.idling_now").value(0))
+                .andExpect(jsonPath("$.open_alerts").value(0))
+                .andExpect(jsonPath("$.latest_event_at").isNotEmpty());
+
+        mockMvc.perform(get("/v1/vehicles").param("tenant_id", "tenant-demo"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].vehicle_id").value("overview-vehicle"))
+                .andExpect(jsonPath("$[0].status").value("moving"))
+                .andExpect(jsonPath("$[0].latitude").value(12.9716))
+                .andExpect(jsonPath("$[0].longitude").value(77.5946));
+
+        mockMvc.perform(get("/v1/fleet/overview").param("tenant_id", "another-tenant"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.vehicles_seen").value(0));
+    }
+
     private void send(String eventId, String vehicleId, String observedAt, int speed, int sequence)
             throws Exception {
         mockMvc.perform(post("/v1/telemetry")

@@ -96,6 +96,76 @@ public class TelemetryService {
                 Math.max(1, Math.min(limit, 500)));
     }
 
+    public FleetOverviewRecord overview(String tenantId) {
+        return jdbcTemplate.queryForObject("""
+                WITH latest AS (
+                    SELECT DISTINCT ON (vehicle_id)
+                           vehicle_id, observed_at, speed_kmh, engine_on
+                    FROM telemetry_events
+                    WHERE tenant_id = ?
+                    ORDER BY vehicle_id, observed_at DESC, event_sequence DESC NULLS LAST, ingested_at DESC
+                )
+                SELECT count(*) AS vehicles_seen,
+                       count(*) FILTER (WHERE observed_at >= now() - interval '5 minutes'
+                           AND engine_on AND speed_kmh > 0.5) AS moving_now,
+                       count(*) FILTER (WHERE observed_at >= now() - interval '5 minutes'
+                           AND engine_on AND speed_kmh <= 0.5) AS idling_now,
+                       count(*) FILTER (WHERE observed_at >= now() - interval '5 minutes'
+                           AND NOT engine_on) AS inactive_now,
+                       count(*) FILTER (WHERE observed_at < now() - interval '5 minutes') AS offline,
+                       (SELECT count(*) FROM fleet_alerts WHERE tenant_id = ? AND status = 'open') AS open_alerts,
+                       (SELECT coalesce(sum(estimated_fuel_litres), 0)
+                        FROM fleet_alerts WHERE tenant_id = ? AND status = 'open') AS estimated_idle_fuel_litres,
+                       (SELECT max(observed_at) FROM latest) AS latest_event_at
+                FROM latest
+                """,
+                (result, row) -> new FleetOverviewRecord(
+                        result.getLong("vehicles_seen"),
+                        result.getLong("moving_now"),
+                        result.getLong("idling_now"),
+                        result.getLong("inactive_now"),
+                        result.getLong("offline"),
+                        result.getLong("open_alerts"),
+                        result.getDouble("estimated_idle_fuel_litres"),
+                        result.getTimestamp("latest_event_at") == null
+                                ? null : result.getTimestamp("latest_event_at").toInstant()),
+                tenantId, tenantId, tenantId);
+    }
+
+    public List<VehicleOverviewRecord> vehicles(String tenantId, int limit) {
+        return jdbcTemplate.query("""
+                SELECT latest.tenant_id, latest.vehicle_id, latest.observed_at,
+                       latest.latitude, latest.longitude, latest.speed_kmh, latest.engine_on,
+                       CASE WHEN latest.observed_at < now() - interval '5 minutes' THEN 'offline'
+                            WHEN NOT latest.engine_on THEN 'inactive'
+                            WHEN latest.speed_kmh <= 0.5 THEN 'idling'
+                            ELSE 'moving' END AS status,
+                       (SELECT count(*) FROM fleet_alerts alert
+                        WHERE alert.tenant_id = latest.tenant_id
+                          AND alert.vehicle_id = latest.vehicle_id AND alert.status = 'open') AS open_alert_count
+                FROM (
+                    SELECT DISTINCT ON (vehicle_id)
+                           tenant_id, vehicle_id, observed_at, latitude, longitude, speed_kmh, engine_on
+                    FROM telemetry_events
+                    WHERE tenant_id = ?
+                    ORDER BY vehicle_id, observed_at DESC, event_sequence DESC NULLS LAST, ingested_at DESC
+                ) latest
+                ORDER BY latest.observed_at DESC
+                LIMIT ?
+                """,
+                (result, row) -> new VehicleOverviewRecord(
+                        result.getString("tenant_id"),
+                        result.getString("vehicle_id"),
+                        result.getString("status"),
+                        result.getTimestamp("observed_at").toInstant(),
+                        result.getBigDecimal("latitude"),
+                        result.getBigDecimal("longitude"),
+                        result.getBigDecimal("speed_kmh"),
+                        result.getLong("open_alert_count")),
+                tenantId,
+                Math.max(1, Math.min(limit, 500)));
+    }
+
     private void updateVehicleState(TelemetryRequest event) {
         jdbcTemplate.query(
                 "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",

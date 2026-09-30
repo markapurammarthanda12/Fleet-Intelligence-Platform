@@ -9,20 +9,21 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 - The Python simulator produces a repeatable 100,000-record synthetic vehicle catalog and synthetic events with delayed and duplicate deliveries.
 - Docker Compose runs Apache Kafka, the API, PostgreSQL, and an operator dashboard, with persistent broker/database volumes and service health checks.
 - The API exposes readiness through Spring Boot Actuator and supports bounded telemetry history queries.
+- Fleet overview and vehicle-list APIs derive counts, current status, last seen time, and last reported coordinates from each tenant's latest telemetry; the dashboard uses these APIs for its overview.
 - Idling alerts escalate from `warning` to `critical` after 15 minutes by default and are returned with open, critical alerts first. This is a demo policy configurable with `IDLE_CRITICAL_SECONDS`.
 
 ## Hackathon deliverables and current status
 
 | Deliverable | Current status | What remains |
 |---|---|---|
-| Dockerized, portable system | GitHub Compose configuration and Kafka-backed tests pass; local Compose rebuild started but service health remains unverified | Confirm the refreshed stack on the Mac and add deployment profiles and cloud portability evidence |
+| Dockerized, portable system | Compose stack rebuilt and locally verified with Kafka, PostgreSQL, API, and dashboard running; API readiness reports `UP` | Add deployment profiles and cloud portability evidence; local Kafka remains single-node |
 | Real-time ingestion and alerting | The API waits for Kafka broker acknowledgement; keyed consumer persists idempotently, retries failures, and routes exhausted retries to a dead-letter topic | Measure end-to-end latency and burst behavior at challenge scale; test dead-letter replay |
 | Relational and high-volume data | PostgreSQL telemetry, vehicle state, and alert tables are implemented | Add fleet metadata and a high-volume telemetry store after measuring workload |
-| User interface | Local dashboard with tenant and vehicle filters and automatic refresh | Add alert acknowledgement and authenticated API access |
+| User interface | Fleet overview with telemetry-derived vehicle counts, current vehicle states, last reported coordinates, recent idling alerts, and automatic refresh | Add alert acknowledgement, authenticated API access, a map provider, and the other fleet workflows |
 | Security, tests, and observability | Six Kafka/PostgreSQL API integration tests, simulator coverage tests, and the production dashboard build pass in GitHub Actions | Measure core coverage; add tenant-aware access controls, security checks, and metrics/logs/traces |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
-Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, PostgreSQL, dashboard, persistent volumes, and health checks. A rebuild was started from Docker Desktop; it was still in the Maven dependency step at last observation, so service health is not verified. This is not a claim of cloud portability, high availability, or challenge-scale performance.
+Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, PostgreSQL, dashboard, persistent volumes, and health checks. The development Mac stack was rebuilt and checked: all four services were running and the API readiness endpoint returned `UP`. This is not a claim of cloud portability, high availability, or challenge-scale performance.
 
 The generator can create exactly 100,000 synthetic vehicle records. Generating at least 100,000 base telemetry events distributes at least one event to every generated vehicle. This proves deterministic dataset generation only; it does not claim that the current API sustains the challenge's 100,000 events/second target.
 
@@ -65,7 +66,7 @@ If you want to change local settings, create the optional environment file befor
 cp .env.example .env
 ```
 
-The optional `.env` copy is only needed if you want to customize settings; defaults work for local development. The API is available at `http://localhost:8080`, and readiness is at `/actuator/health/readiness`. Submit a telemetry event to `POST /v1/telemetry`, then read it back with `GET /v1/telemetry?tenant_id=tenant-00&vehicle_id=vehicle-000001` or view its alert at `/v1/alerts?tenant_id=tenant-00`.
+The optional `.env` copy is only needed if you want to customize settings; defaults work for local development. The API is available at `http://localhost:8080`, and readiness is at `/actuator/health/readiness`. Submit a telemetry event to `POST /v1/telemetry`, then read it back with `GET /v1/telemetry?tenant_id=tenant-00&vehicle_id=vehicle-000001`. The dashboard overview uses `GET /v1/fleet/overview?tenant_id=tenant-00`, `GET /v1/vehicles?tenant_id=tenant-00`, and `GET /v1/alerts?tenant_id=tenant-00`.
 
 Example request:
 
@@ -80,6 +81,8 @@ The API returns `202 Accepted` only after Kafka acknowledges the event; the resp
 Local Kafka stores seven days of topic data across 12 partitions. For a replay of retained events, stop the API consumer, reset its group offset, then start it again. PostgreSQL's event ID uniqueness makes reprocessed events safe from duplicate inserts. The local broker is a single instance with replication factor 1; a shared environment must use a multi-broker cluster with replication factor 3 and minimum in-sync replicas 2 to remove that broker as a single point of failure. The local setup uses plaintext Kafka and is not production-secure.
 
 The sample password in `.env.example` is for a local demonstration only. Use a managed secret for any shared or deployed environment. `docker compose down` stops the services; `docker compose down -v` also removes the local database volume and its data.
+
+The overview only counts vehicles that have sent telemetry; it is not a registered-vehicle inventory. A vehicle is shown as moving or idling only when an engine-on event has arrived within five minutes. Engine-off vehicles and vehicles with stale telemetry are called out separately. Coordinates are displayed as reported by the vehicle; a map/geocoding provider is not connected. The Drivers, Routes & Dispatch, Maintenance, Fuel Management, and Reports items are shown as planned areas, not completed workflows. The fuel figure is an assumption-based idling estimate, not measured savings.
 
 To generate a full 100,000-vehicle synthetic dataset locally, open **Terminal** in the project folder and run:
 
