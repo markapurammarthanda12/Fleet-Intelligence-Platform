@@ -1,0 +1,11 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      FUEL_LITRES_PER_IDLE_HOUR: ${FUEL_LITRES_PER_IDLE_HOUR:-1.5}
+      IDLE_ALERT_SECONDS: ${IDLE_ALERT_SECONDS:-300}
