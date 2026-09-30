@@ -279,38 +279,49 @@ export default function App() {
     }
 
     let active = true;
-    setAnalyticsLoading(true);
+    let initialLoad = true;
     const query = new URLSearchParams({
       tenant_id: DEMO_TENANT_ID,
       from: from.toISOString(),
       to: to.toISOString(),
     });
-    fetch(`/api/v1/analytics/telemetry/hourly?${query.toString()}`, { headers: { Accept: "application/json" } })
-      .then(async (response) => {
-        if (response.status === 404) {
-          throw new Error("Reports are not enabled in the currently running API. Update the local application image to enable this section.");
-        }
-        if (response.status === 503) {
-          throw new Error("The historical analytics store is not ready. Check that ClickHouse is running.");
-        }
-        if (!response.ok) throw new Error(`Reports could not be loaded (HTTP ${response.status}).`);
-        return response.json() as Promise<Array<Record<string, unknown>>>;
-      })
-      .then((rows) => {
-        if (!active) return;
-        setAnalytics(rows.map(normalizeAnalytics));
-        setAnalyticsError("");
-      })
-      .catch((cause) => {
-        if (!active) return;
-        setAnalyticsError(cause instanceof Error ? cause.message : "Historical analytics are unavailable.");
-        setAnalytics([]);
-      })
-      .finally(() => {
-        if (active) setAnalyticsLoading(false);
-      });
-    return () => { active = false; };
-  }, [analyticsFrom, analyticsTo, demoSignedIn]);
+    const refreshAnalytics = () => {
+      if (initialLoad) setAnalyticsLoading(true);
+      fetch(`/api/v1/analytics/telemetry/hourly?${query.toString()}`, { headers: { Accept: "application/json" } })
+        .then(async (response) => {
+          if (response.status === 404) {
+            throw new Error("Reports are not enabled in the currently running API. Update the local application image to enable this section.");
+          }
+          if (response.status === 503) {
+            throw new Error("The historical analytics store is not ready. Check that ClickHouse is running.");
+          }
+          if (!response.ok) throw new Error(`Reports could not be loaded (HTTP ${response.status}).`);
+          return response.json() as Promise<Array<Record<string, unknown>>>;
+        })
+        .then((rows) => {
+          if (!active) return;
+          setAnalytics(rows.map(normalizeAnalytics));
+          setAnalyticsError("");
+        })
+        .catch((cause) => {
+          if (!active) return;
+          setAnalyticsError(cause instanceof Error ? cause.message : "Historical analytics are unavailable.");
+          setAnalytics([]);
+        })
+        .finally(() => {
+          if (active && initialLoad) {
+            initialLoad = false;
+            setAnalyticsLoading(false);
+          }
+        });
+    };
+    refreshAnalytics();
+    const timer = settings.realTimeAlerts ? window.setInterval(refreshAnalytics, 5000) : undefined;
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearInterval(timer);
+    };
+  }, [analyticsFrom, analyticsTo, demoSignedIn, settings.realTimeAlerts]);
 
   useEffect(() => {
     if (!selectedVehicleId) {
@@ -319,19 +330,32 @@ export default function App() {
       return;
     }
     let active = true;
-    setVehicleHistoryLoading(true);
+    let initialLoad = true;
     setVehicleHistoryError("");
     const query = new URLSearchParams({ tenant_id: DEMO_TENANT_ID, vehicle_id: selectedVehicleId, limit: "50" });
-    fetch(`/api/v1/telemetry?${query.toString()}`, { headers: { Accept: "application/json" } })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Vehicle history could not be loaded (HTTP ${response.status}).`);
-        return response.json() as Promise<Array<Record<string, unknown>>>;
-      })
-      .then((events) => { if (active) setVehicleHistory(events.map(normalizeTelemetry)); })
-      .catch((cause) => { if (active) setVehicleHistoryError(cause instanceof Error ? cause.message : "Vehicle history is unavailable."); })
-      .finally(() => { if (active) setVehicleHistoryLoading(false); });
-    return () => { active = false; };
-  }, [selectedVehicleId]);
+    const refreshVehicleHistory = () => {
+      if (initialLoad) setVehicleHistoryLoading(true);
+      fetch(`/api/v1/telemetry?${query.toString()}`, { headers: { Accept: "application/json" } })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`Vehicle history could not be loaded (HTTP ${response.status}).`);
+          return response.json() as Promise<Array<Record<string, unknown>>>;
+        })
+        .then((events) => { if (active) setVehicleHistory(events.map(normalizeTelemetry)); })
+        .catch((cause) => { if (active) setVehicleHistoryError(cause instanceof Error ? cause.message : "Vehicle history is unavailable."); })
+        .finally(() => {
+          if (active && initialLoad) {
+            initialLoad = false;
+            setVehicleHistoryLoading(false);
+          }
+        });
+    };
+    refreshVehicleHistory();
+    const timer = settings.realTimeAlerts ? window.setInterval(refreshVehicleHistory, 5000) : undefined;
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearInterval(timer);
+    };
+  }, [selectedVehicleId, settings.realTimeAlerts]);
 
   const analyticsTotals = useMemo(() => analytics.reduce((totals, row) => ({
     events: totals.events + row.unique_events,
@@ -596,7 +620,7 @@ export default function App() {
 
           <section className="settings-screen panel" id="settings" aria-labelledby="settings-title">
             <div className="settings-heading"><div><div className="section-title-row"><h2 id="settings-title">Settings</h2><span className="preview-badge">This browser</span></div><p>Set local dashboard preferences for the demo workspace.</p></div></div>
-            <div className="settings-layout"><nav className="settings-nav" aria-label="Settings categories"><a className="selected" href="#settings-general">⚙ General</a><a href="#settings-notifications">♧ Notifications</a><a href="#settings-data">◈ Data sources</a><a href="#settings-security">♢ Security</a></nav><div className="settings-form" id="settings-general"><h3>General settings</h3><p>These preferences are saved locally in this browser.</p><div className="settings-fields"><label>Organization name<input value={settings.organization} onChange={(event) => updateSetting("organization", event.target.value)} /></label><label>Time zone<select value={settings.timeZone} onChange={(event) => updateSetting("timeZone", event.target.value)}><option value="Asia/Kolkata">(GMT+05:30) Asia/Kolkata</option><option value="UTC">(GMT+00:00) UTC</option><option value="America/Los_Angeles">(GMT-08:00) America/Los Angeles</option></select></label><label>Date format<select value={settings.dateFormat} onChange={(event) => updateSetting("dateFormat", event.target.value)}><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></label><label>Language<select value={settings.language} onChange={(event) => updateSetting("language", event.target.value)}><option>English</option></select></label></div><div className="settings-toggles"><label><span><strong>Real-time alert refresh</strong><small>Refresh fleet data automatically every five seconds</small></span><input type="checkbox" checked={settings.realTimeAlerts} onChange={(event) => updateSetting("realTimeAlerts", event.target.checked)} /></label><label><span><strong>Auto-acknowledge priority alerts</strong><small>Demo preference only; no acknowledgement API exists</small></span><input type="checkbox" checked={settings.autoAcknowledge} onChange={(event) => updateSetting("autoAcknowledge", event.target.checked)} /></label><label><span><strong>Show vehicle locations on map</strong><small>Display coordinates reported by telemetry</small></span><input type="checkbox" checked={settings.showLocations} onChange={(event) => updateSetting("showLocations", event.target.checked)} /></label></div><div className="settings-actions"><span role="status">{settingsSaved ? "Preferences saved in this browser." : ""}</span><button className="primary-button" type="button" onClick={() => { localStorage.setItem("fleet-demo-settings", JSON.stringify(settings)); setSettingsSaved(true); }}>Save changes</button></div></div></div>
+            <div className="settings-layout"><nav className="settings-nav" aria-label="Settings categories"><a className="selected" href="#settings-general">⚙ General</a><a href="#settings-notifications">♧ Notifications</a><a href="#settings-data">◈ Data sources</a><a href="#settings-security">♢ Security</a></nav><div className="settings-form" id="settings-general"><h3>General settings</h3><p>These preferences are saved locally in this browser.</p><div className="settings-fields"><label>Organization name<input value={settings.organization} onChange={(event) => updateSetting("organization", event.target.value)} /></label><label>Time zone<select value={settings.timeZone} onChange={(event) => updateSetting("timeZone", event.target.value)}><option value="Asia/Kolkata">(GMT+05:30) Asia/Kolkata</option><option value="UTC">(GMT+00:00) UTC</option><option value="America/Los_Angeles">(GMT-08:00) America/Los Angeles</option></select></label><label>Date format<select value={settings.dateFormat} onChange={(event) => updateSetting("dateFormat", event.target.value)}><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></label><label>Language<select value={settings.language} onChange={(event) => updateSetting("language", event.target.value)}><option>English</option></select></label></div><div className="settings-toggles"><label><span><strong>Live data refresh</strong><small>Refresh fleet, maps, analytics, and vehicle history every five seconds</small></span><input type="checkbox" checked={settings.realTimeAlerts} onChange={(event) => updateSetting("realTimeAlerts", event.target.checked)} /></label><label><span><strong>Auto-acknowledge priority alerts</strong><small>Demo preference only; no acknowledgement API exists</small></span><input type="checkbox" checked={settings.autoAcknowledge} onChange={(event) => updateSetting("autoAcknowledge", event.target.checked)} /></label><label><span><strong>Show vehicle locations on map</strong><small>Display coordinates reported by telemetry</small></span><input type="checkbox" checked={settings.showLocations} onChange={(event) => updateSetting("showLocations", event.target.checked)} /></label></div><div className="settings-actions"><span role="status">{settingsSaved ? "Preferences saved in this browser." : ""}</span><button className="primary-button" type="button" onClick={() => { localStorage.setItem("fleet-demo-settings", JSON.stringify(settings)); setSettingsSaved(true); }}>Save changes</button></div></div></div>
           </section>
 
           <footer className="page-footer"><span>Fleet Intelligence Platform</span><span>Connected data. Clear decisions.</span></footer>
