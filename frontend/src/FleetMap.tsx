@@ -14,6 +14,7 @@ export type MapVehicle = {
 type Props = { vehicles: MapVehicle[] };
 
 const statusColor: Record<string, string> = { moving: "#11a77b", idling: "#e9952d", inactive: "#7b8ba4", offline: "#9aa6b7" };
+const shortVehicleId = (value: string) => value.length > 20 ? `${value.slice(0, 12)}…${value.slice(-6)}` : value;
 
 export default function FleetMap({ vehicles }: Props) {
   const element = useRef<HTMLDivElement | null>(null);
@@ -66,7 +67,8 @@ export default function FleetMap({ vehicles }: Props) {
       group.forEach((item) => {
         const details = document.createElement("div");
         const name = document.createElement("strong");
-        name.textContent = item.vehicle_id;
+        name.textContent = shortVehicleId(item.vehicle_id);
+        name.title = item.vehicle_id;
         const signal = document.createElement("div");
         signal.textContent = `${item.status} · ${item.speed_kmh.toFixed(0)} km/h`;
         details.append(name, signal);
