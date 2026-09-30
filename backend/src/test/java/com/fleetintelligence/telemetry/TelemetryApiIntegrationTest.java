@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.stream.StreamSupport;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -107,7 +108,7 @@ class TelemetryApiIntegrationTest {
                     .atMost(Duration.ofSeconds(10))
                     .untilAsserted(() -> {
                         ConsumerRecords<String, String> records = replayConsumer.poll(Duration.ofMillis(250));
-                        boolean replayed = records.records(TELEMETRY_TOPIC).stream()
+                        boolean replayed = StreamSupport.stream(records.records(TELEMETRY_TOPIC).spliterator(), false)
                                 .map(ConsumerRecord::value)
                                 .anyMatch(payload -> payload.contains("\"event_id\":\"replay-event\""));
                         org.assertj.core.api.Assertions.assertThat(replayed).isTrue();
