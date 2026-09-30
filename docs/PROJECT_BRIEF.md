@@ -34,7 +34,7 @@ Targets are project goals; they are not measured results yet.
 
 - Synthetic location coordinates are generated around Bengaluru and do not represent real vehicles.
 - Fuel burn during idling varies by vehicle and conditions. The default 1.5 litres/hour is an illustrative assumption.
-- A single event cannot establish an idle duration. The Kafka consumer uses per-vehicle event-time state to open and resolve prolonged-idling alerts; late events are persisted but do not rewind the current vehicle state. The local Kafka-backed journey awaits CI and local-stack verification.
+- A single event cannot establish an idle duration. The Kafka consumer uses per-vehicle event-time state to open and resolve prolonged-idling alerts; late events are persisted but do not rewind the current vehicle state. GitHub Actions verifies the broker-to-database journey with Kafka and PostgreSQL Testcontainers; the local Compose runtime still needs verification after the broker change.
 - Driver-level attribution is out of scope until privacy, consent, and access requirements are defined.
 
 ## Boundary
