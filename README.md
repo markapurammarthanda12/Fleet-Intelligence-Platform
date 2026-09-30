@@ -6,7 +6,7 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 
 - A Java 21 / Spring Boot API validates connected-vehicle telemetry and stores it in PostgreSQL.
 - PostgreSQL uniqueness on `(tenant_id, event_id)` makes retries idempotent; duplicate submissions are acknowledged without a second row.
-- The Python simulator produces reproducible synthetic events, including delayed and duplicate deliveries.
+- The Python simulator produces a repeatable 100,000-record synthetic vehicle catalog and synthetic events with delayed and duplicate deliveries.
 - Docker Compose is configured for the API, PostgreSQL, and an operator dashboard, with a persistent database volume and a database health check.
 - The API exposes readiness through Spring Boot Actuator and supports bounded telemetry history queries.
 - Idling alerts escalate from `warning` to `critical` after 15 minutes by default and are returned with open, critical alerts first. This is a demo policy configurable with `IDLE_CRITICAL_SECONDS`.
@@ -19,12 +19,12 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 | Real-time ingestion and alerting | API validates and persists idempotent events; sustained-idle alerts have been exercised end to end on the local stack | Add Kafka stream processing and latency evidence at challenge scale |
 | Relational and high-volume data | PostgreSQL telemetry, vehicle state, and alert tables are implemented | Add fleet metadata and a high-volume telemetry store after measuring workload |
 | User interface | Local dashboard with tenant and vehicle filters and automatic refresh | Add alert acknowledgement and authenticated API access |
-| Security, tests, and observability | Five PostgreSQL-backed API integration tests and the production dashboard build pass in GitHub Actions | Measure core coverage; add tenant-aware access controls, security checks, and metrics/logs/traces |
+| Security, tests, and observability | Five PostgreSQL-backed API integration tests, simulator coverage tests, and the production dashboard build pass in GitHub Actions | Measure core coverage; add tenant-aware access controls, security checks, and metrics/logs/traces |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
 Docker is part of the deliverable. Compose defines the API, PostgreSQL, dashboard, persistent volume, and database health check. The local stack and one synthetic alert journey have been verified; this is not a claim of cloud portability or challenge-scale performance.
 
-The simulator accepts 100,000 vehicles. That is a data-generation capability, not a claim that the current API sustains the challenge's 100,000 events/second target.
+The generator can create exactly 100,000 synthetic vehicle records. Generating at least 100,000 base telemetry events distributes at least one event to every generated vehicle. This proves deterministic dataset generation only; it does not claim that the current API sustains the challenge's 100,000 events/second target.
 
 ## Quick start
 
@@ -79,7 +79,13 @@ A newly inserted event returns `201 Created`; retrying the same event ID for tha
 
 The sample password in `.env.example` is for a local demonstration only. Use a managed secret for any shared or deployed environment. `docker compose down` stops the services; `docker compose down -v` also removes the local database volume and its data.
 
-To generate synthetic telemetry locally, install the small Python package with `pip install -e .`, then run `fleetintel-sim --vehicles 100000 --events 1000 --output data/sample.jsonl`.
+To generate a full 100,000-vehicle synthetic dataset locally, open **Terminal** in the project folder and run:
+
+```bash
+bash scripts/generate_dataset.sh
+```
+
+This uses Docker to run the Python generator, so you do not need to install Python. It writes 100,000 synthetic vehicle-catalog rows plus a repeatable telemetry sample covering those vehicle IDs under the project's `data/` folder. The event file may contain a few extra rows because it deliberately includes duplicate deliveries. Pass generator options after the script name, such as `--seed 7`, to change deterministic inputs. These generated files are local and are not checked into Git. To generate a smaller sample, use the Python package directly with Python 3.11 or later.
 
 ## Repository map
 

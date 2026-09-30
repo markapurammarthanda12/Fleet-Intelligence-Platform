@@ -22,7 +22,7 @@ This is a hypothesis, not yet validated by customer interviews or operational da
 
 | Measure | Initial target | Evidence needed |
 |---|---:|---|
-| Simulator fleet size | 100,000 vehicle IDs | Generated dataset metadata |
+| Simulator fleet size | 100,000 vehicle IDs | Reproducible generator and automated test verify exact catalog size, unique IDs, tenant spread, and event coverage |
 | Event acceptance | No malformed accepted events | Contract and integration evidence |
 | Duplicate behavior | Repeated event ID does not create a second telemetry row | Idempotency scenario |
 | Alert freshness | Under 5 seconds in a measured end-to-end run | Load test with timestamps after alerting is implemented |
