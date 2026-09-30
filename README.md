@@ -5,23 +5,23 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 ## Current implementation
 
 - A Java 21 / Spring Boot API validates connected-vehicle telemetry and stores it in PostgreSQL.
-- PostgreSQL uniqueness on `event_id` makes retries idempotent; duplicate submissions are acknowledged without a second row.
+- PostgreSQL uniqueness on `(tenant_id, event_id)` makes retries idempotent; duplicate submissions are acknowledged without a second row.
 - The Python simulator produces reproducible synthetic events, including delayed and duplicate deliveries.
-- Docker Compose starts the API, PostgreSQL, and an operator dashboard, with a persistent database volume and a database health check.
+- Docker Compose is configured for the API, PostgreSQL, and an operator dashboard, with a persistent database volume and a database health check.
 - The API exposes readiness through Spring Boot Actuator and supports bounded telemetry history queries.
 
 ## Hackathon deliverables and current status
 
 | Deliverable | Current status | What remains |
 |---|---|---|
-| Dockerized, portable system | API, PostgreSQL, and dashboard run as Compose services | Add simulator, broker, production secrets, deployment profile, and end-to-end evidence |
+| Dockerized, portable system | Compose defines API, PostgreSQL, and dashboard services; runtime is not verified yet | Add simulator, broker, production secrets, deployment profile, and end-to-end evidence |
 | Real-time ingestion and alerting | Spring API validates and persists events; retries are idempotent | Add Kafka stream processing and explainable fleet alerts with latency evidence |
-| Relational and high-volume data | PostgreSQL telemetry table and query index are implemented | Add fleet/alert entities and a high-volume telemetry store after measuring workload |
+| Relational and high-volume data | PostgreSQL telemetry, vehicle state, and alert tables are implemented | Add fleet metadata and a high-volume telemetry store after measuring workload |
 | User interface | Tenant and vehicle filtered alert dashboard with automatic refresh | Add alert acknowledgement and authenticated API access |
 | Security, tests, and observability | Not implemented in this starter | Add tenant-aware access controls, automated checks, metrics/logs/traces, and documented security decisions |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
-Docker is part of the deliverable. The current Compose profile starts the API and PostgreSQL, but the full stack is not containerized or cloud-portable until the remaining services are added and exercised together.
+Docker is part of the deliverable. Compose defines the API, PostgreSQL, dashboard, persistent volume, and database health check, but the full stack is not runtime-verified or cloud-portable until the remaining services are added and exercised together.
 
 The simulator accepts 100,000 vehicles. That is a data-generation capability, not a claim that the current API sustains the challenge's 100,000 events/second target.
 
@@ -75,7 +75,7 @@ To generate synthetic telemetry locally, install the small Python package with `
 | `IDLE_ALERT_SECONDS` | `300` | Stationary engine-on duration before an idling alert opens |
 | `FUEL_LITRES_PER_IDLE_HOUR` | `1.5` | Illustrative fuel-burn assumption used in alert estimates |
 
-Fuel-use assumptions will be introduced with the idling alert workflow and must be documented before presenting savings as measured results.
+Fuel-use assumptions are illustrative and must be calibrated with documented fleet-specific data before presenting savings as measured results.
 
 ## Next milestones
 
