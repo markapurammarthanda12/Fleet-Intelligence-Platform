@@ -13,7 +13,7 @@ flowchart LR
   API --> READY[Actuator readiness endpoint]
 ```
 
-Docker Compose starts the Spring Boot API, PostgreSQL, and React dashboard. Flyway creates the telemetry, vehicle runtime state, and alert tables with bounded-query indexes. PostgreSQL enforces uniqueness on `(tenant_id, event_id)`, so retries after a lost response do not create a second record for that tenant. The API validates coordinates, speed, identifiers, and event time before writing. A versioned event-time rule opens and resolves idling alerts with a documented fuel estimate; late events are stored but do not rewind live vehicle state. The dashboard filters alerts by tenant and vehicle and refreshes automatically. Authentication, stream alerts, and high-volume benchmarks are not implemented yet.
+Docker Compose is configured for the Spring Boot API, PostgreSQL, and React dashboard; this stack has not been runtime-verified yet. Flyway creates the telemetry, vehicle runtime state, and alert tables with bounded-query indexes. PostgreSQL enforces uniqueness on `(tenant_id, event_id)`, so retries after a lost response do not create a second record for that tenant. The API validates coordinates, speed, identifiers, and event time before writing. A versioned event-time rule opens and resolves idling alerts with a documented fuel estimate; late events are stored but do not rewind live vehicle state. The dashboard filters alerts by tenant and vehicle and refreshes automatically. Authentication, Kafka stream processing, and high-volume benchmarks are not implemented yet.
 
 ## Intended challenge architecture
 
