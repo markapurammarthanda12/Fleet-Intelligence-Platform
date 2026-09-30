@@ -1,0 +1,7 @@
+<clickhouse>
+    <kafka>
+        <consumer>
+            <auto_offset_reset>earliest</auto_offset_reset>
+        </consumer>
+    </kafka>
+</clickhouse>

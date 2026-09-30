@@ -3,6 +3,8 @@ package com.fleetintelligence.analytics;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -11,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.util.UriUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -18,7 +22,7 @@ public class ClickHouseAnalyticsService {
     private static final Duration MAX_RANGE = Duration.ofDays(31);
     private static final String HOURLY_QUERY = """
             SELECT
-                toUnixTimestamp64Milli(toStartOfHour(observed_at)) AS bucket_start_epoch_ms,
+                toUnixTimestamp(toStartOfHour(observed_at)) * 1000 AS bucket_start_epoch_ms,
                 uniqExact(event_id) AS unique_events,
                 uniqExact(vehicle_id) AS vehicles_seen,
                 uniqExactIf(event_id, engine_on AND speed_kmh <= 0.5) AS idling_events,
@@ -49,13 +53,15 @@ public class ClickHouseAnalyticsService {
         }
 
         try {
+            URI queryUri = UriComponentsBuilder.fromPath("/")
+                    .queryParam("query", UriUtils.encodeQueryParam(HOURLY_QUERY, StandardCharsets.UTF_8))
+                    .queryParam("param_tenant_id", UriUtils.encodeQueryParam(tenantId, StandardCharsets.UTF_8))
+                    .queryParam("param_start", UriUtils.encodeQueryParam(from.toString(), StandardCharsets.UTF_8))
+                    .queryParam("param_end", UriUtils.encodeQueryParam(to.toString(), StandardCharsets.UTF_8))
+                    .build(true)
+                    .toUri();
             String response = clickHouse.get()
-                    .uri(uri -> uri
-                            .queryParam("query", HOURLY_QUERY)
-                            .queryParam("param_tenant_id", tenantId)
-                            .queryParam("param_start", from.toString())
-                            .queryParam("param_end", to.toString())
-                            .build())
+                    .uri(queryUri)
                     .retrieve()
                     .body(String.class);
             return parseRows(response == null ? "" : response);

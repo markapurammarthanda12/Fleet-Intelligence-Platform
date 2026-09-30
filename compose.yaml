@@ -37,6 +37,7 @@ services:
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - ./infra/clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./infra/clickhouse/config.d/kafka.xml:/etc/clickhouse-server/config.d/kafka.xml:ro
     healthcheck:
       test: ["CMD-SHELL", "clickhouse-client --user $${CLICKHOUSE_USER} --password $${CLICKHOUSE_PASSWORD} --query 'SELECT 1' >/dev/null 2>&1"]
       interval: 10s
