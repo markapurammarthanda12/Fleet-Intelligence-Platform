@@ -13,6 +13,9 @@ docker run --rm \
   python fleetpulse/simulator.py \
     --vehicles 100000 \
     --events 100000 \
+    --tenant-id tenant-100k \
+    --start-time "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    --interval-seconds 0 \
     --vehicle-output /data/vehicles.jsonl \
     --output /data/telemetry.jsonl \
     "$@"

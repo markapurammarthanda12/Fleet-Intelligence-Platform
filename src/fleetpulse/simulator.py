@@ -27,7 +27,7 @@ def parse_timestamp(value: str) -> datetime:
     return timestamp.astimezone(timezone.utc).replace(microsecond=0)
 
 
-def generate_vehicles(vehicles: int, seed: int):
+def generate_vehicles(vehicles: int, seed: int, tenant_id: str | None = None):
     """Yield a stable synthetic fleet catalog containing exactly `vehicles` IDs."""
     if vehicles < 1:
         raise ValueError("vehicles must be positive")
@@ -35,7 +35,7 @@ def generate_vehicles(vehicles: int, seed: int):
     for number in range(vehicles):
         index = rng.randrange(len(MAKES))
         yield {
-            "tenant_id": f"tenant-{number % TENANT_COUNT:02d}",
+            "tenant_id": tenant_id or f"tenant-{number % TENANT_COUNT:02d}",
             "vehicle_id": f"vehicle-{number:06d}",
             "synthetic_asset_id": f"SYNTH-{number:08d}",
             "make": MAKES[index],
@@ -46,7 +46,14 @@ def generate_vehicles(vehicles: int, seed: int):
         }
 
 
-def generate_events(vehicles: int, events: int, seed: int, start_time: datetime | None = None):
+def generate_events(
+    vehicles: int,
+    events: int,
+    seed: int,
+    start_time: datetime | None = None,
+    tenant_id: str | None = None,
+    interval_seconds: int = 1,
+):
     """Yield repeatable JSON-ready events, including late and duplicate deliveries."""
     if vehicles < 1:
         raise ValueError("vehicles must be positive")
@@ -57,13 +64,13 @@ def generate_events(vehicles: int, events: int, seed: int, start_time: datetime 
     for sequence in range(events):
         vehicle_number = sequence % vehicles
         idle = rng.random() < 0.12
-        timestamp = start + timedelta(seconds=sequence)
+        timestamp = start + timedelta(seconds=sequence * interval_seconds)
         # A small share arrives late to exercise event-time handling downstream.
         if rng.random() < 0.03:
             timestamp -= timedelta(seconds=rng.randint(1, 90))
         event = {
             "event_id": str(uuid.uuid5(uuid.NAMESPACE_OID, f"{seed}:{sequence}")),
-            "tenant_id": f"tenant-{vehicle_number % TENANT_COUNT:02d}",
+            "tenant_id": tenant_id or f"tenant-{vehicle_number % TENANT_COUNT:02d}",
             "vehicle_id": f"vehicle-{vehicle_number:06d}",
             "observed_at": timestamp.isoformat().replace("+00:00", "Z"),
             "latitude": round(12.9 + rng.random() * 0.5, 6),
@@ -105,18 +112,27 @@ def main() -> None:
     parser.add_argument("--vehicles", type=int, default=100_000, help="synthetic vehicle catalog size")
     parser.add_argument("--events", type=int, default=10_000, help="base telemetry events before retries")
     parser.add_argument("--seed", type=int, default=42, help="seed for repeatable synthetic values")
+    parser.add_argument("--tenant-id", help="put every generated vehicle and event in one fleet")
+    parser.add_argument(
+        "--interval-seconds", type=int, default=1,
+        help="event-time interval between records (use 0 to seed a current fleet snapshot)",
+    )
     parser.add_argument("--start-time", type=parse_timestamp, default=parse_timestamp(DEFAULT_START_TIME))
     parser.add_argument("--output", default="-", help="telemetry JSONL path, or - for stdout")
     parser.add_argument("--vehicle-output", help="optional vehicle catalog JSONL path")
     args = parser.parse_args()
-    if args.vehicles < 1 or args.events < 0:
-        parser.error("--vehicles must be positive and --events cannot be negative")
+    if args.vehicles < 1 or args.events < 0 or args.interval_seconds < 0:
+        parser.error("--vehicles must be positive; --events and --interval-seconds cannot be negative")
 
     if args.vehicle_output:
-        vehicle_count = write_jsonl(generate_vehicles(args.vehicles, args.seed), args.vehicle_output)
+        vehicle_count = write_jsonl(
+            generate_vehicles(args.vehicles, args.seed, args.tenant_id), args.vehicle_output
+        )
         print(f"Wrote {vehicle_count} synthetic vehicles to {args.vehicle_output}", file=sys.stderr)
     write_jsonl(
-        generate_events(args.vehicles, args.events, args.seed, args.start_time),
+        generate_events(
+            args.vehicles, args.events, args.seed, args.start_time, args.tenant_id, args.interval_seconds
+        ),
         args.output,
     )
 

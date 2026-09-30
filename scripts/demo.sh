@@ -2,7 +2,7 @@
 set -euo pipefail
 
 API_BASE_URL="${API_BASE_URL:-http://localhost:8080}"
-TENANT_ID="tenant-demo"
+TENANT_ID="tenant-100k"
 VEHICLE_ID="vehicle-demo-$(uuidgen | tr '[:upper:]' '[:lower:]')"
 FIRST_EVENT_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
 SECOND_EVENT_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
@@ -43,4 +43,4 @@ for attempt in {1..40}; do
   fi
   sleep 0.25
 done
-printf '\n\nIn the dashboard, set Fleet / tenant to %s.\n' "$TENANT_ID"
+printf '\n\nOpen Alerts in the local dashboard to see the generated idle alert.\n'

@@ -12,7 +12,8 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 - Hosted API mode validates OAuth2/OIDC JWTs against a configured issuer, checks `fleet.read` / `fleet.ingest` scopes, and rejects tenant IDs that do not match the signed `tenant_id` claim. Local Compose explicitly selects an unauthenticated demo mode for quick local use.
 - Fleet overview and vehicle-list APIs derive counts, current status, last seen time, and last reported coordinates from each tenant's latest telemetry; the dashboard uses these APIs for its overview.
 - The dashboard follows a fleet-operations layout with a dark navigation rail, summary cards, fleet trend charts, status donut, searchable map/list, alert center, analytics, vehicle details, a local demo rule catalog, reports, and browser-local settings. The local demo workspace is selected automatically; operators do not type an internal tenant ID.
-- If the telemetry or analytics API is unavailable, the dashboard displays clearly labeled synthetic sample values so the screens remain explorable. The fleet map uses Leaflet and OpenStreetMap tiles with attribution. Drivers, Routes & Dispatch, Maintenance, and Fuel Management remain clearly marked synthetic previews, not connected fleet records; they support search, status filters, and sample-record details.
+- Core dashboard, vehicle, map, alert, and report values come only from API/database telemetry. If a service is unavailable, the dashboard shows an error or an empty state; it never substitutes a hardcoded fleet. Map coordinates are taken from telemetry records. The fleet map uses Leaflet and OpenStreetMap tiles with attribution.
+- An optional Python live-simulator service emits changing synthetic telemetry through the same validated API and Kafka path as other vehicle events. This is generated test data, not data from physical connected vehicles.
 - Idling alerts escalate from `warning` to `critical` after 15 minutes by default and are returned with open, critical alerts first. This is a demo policy configurable with `IDLE_CRITICAL_SECONDS`.
 - Kafka also feeds an independent ClickHouse Kafka Engine/materialized-view path for historical analytics. `GET /v1/analytics/telemetry/hourly` returns hourly event, vehicle, idling, and moving counts for a tenant and bounded time range. The dashboard Reports view uses this endpoint.
 
@@ -20,16 +21,16 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 
 | Deliverable | Current status | What remains |
 |---|---|---|
-| Dockerized, portable system | Compose now defines Kafka, ClickHouse, PostgreSQL, API, and dashboard with persistent data volumes and health checks. Frontend production build and GitHub CI passed; the latest Docker Compose rebuild stalled in the API Maven package step and the updated five-service runtime remains unverified. | Rebuild and verify all five containers; add deployment profiles and cloud portability evidence; local Kafka remains single-node |
+| Dockerized, portable system | Compose defines Kafka, ClickHouse, PostgreSQL, API, dashboard, and an optional live-simulator profile. | Verify the latest rebuilt stack; local Kafka remains single-node |
 | Real-time ingestion and alerting | The API waits for Kafka broker acknowledgement; keyed consumer persists idempotently, retries failures, and routes exhausted retries to a dead-letter topic | Measure end-to-end latency and burst behavior at challenge scale; test dead-letter replay |
 | Relational and high-volume data | PostgreSQL holds transactional events, vehicle state, and alerts. ClickHouse schema and Kafka ingestion path are implemented for analytical history. | Verify ClickHouse consumes broker events end to end; add fleet metadata and evaluate retention/partition settings |
-| User interface | Overview, Vehicles, Alerts, and Reports views plus Drivers, Routes & Dispatch, Maintenance, and Fuel Management previews are present. Preview data is explicitly labeled synthetic. | Connect preview screens to API workflows; verify Reports against the rebuilt stack; add alert acknowledgement, interactive login, and a map provider |
+| User interface | Overview, Vehicles, Alerts, and Reports read API data and have no hardcoded fallback fleet. Additional Drivers, Routes, Maintenance, and Fuel workflows are parked for later. | Verify against the loaded local dataset; add alert acknowledgement and interactive login |
 | Security, tests, and observability | OIDC JWT validation, scope checks, tenant claim isolation, and an integration scenario for unauthenticated/cross-tenant access; simulator tests and dashboard build run in GitHub Actions | Configure a hosted identity provider; add mTLS, TLS, audit events, masking/erasure, security scans, coverage reporting, and metrics/logs/traces |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
 Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, ClickHouse, PostgreSQL, dashboard, persistent volumes, and health checks. A prior four-service local stack was observed running and the API readiness endpoint returned `UP`; the current five-service version still needs a rebuild and runtime check. This is not a claim of cloud portability, high availability, or challenge-scale performance.
 
-The generator can create exactly 100,000 synthetic vehicle records. Generating at least 100,000 base telemetry events distributes at least one event to every generated vehicle. This proves deterministic dataset generation only; it does not claim that the current API sustains the challenge's 100,000 events/second target.
+The generator creates exactly 100,000 synthetic vehicle records and one current telemetry event per vehicle for a one-fleet snapshot. A separate optional stream changes positions and speed at a configurable rate. This does not claim that the current API sustains the challenge's 100,000 events/second target.
 
 ## Quick start
 
@@ -49,24 +50,37 @@ Requires Docker Desktop. You do not need to install Java, Maven, Node.js, Spring
 4. Start the system:
 
    ```bash
-   docker compose up --build
+   docker compose up -d --build
    ```
 
-5. Open `http://localhost:3000` in a browser. The first start downloads the Java, Node, and Kafka images and can take several minutes. Leave the Terminal window open while using the app. Press `Control + C` there to stop it.
+5. Generate and load the 100,000-vehicle fleet:
+
+   ```bash
+   bash scripts/generate_dataset.sh
+   bash scripts/load_dataset.sh
+   ```
+
+   Loading happens through Kafka and the API consumer; allow a few minutes for all vehicle states to appear. Then start the changing telemetry stream:
+
+   ```bash
+   docker compose --profile live-simulator up -d
+   ```
+
+6. Open `http://localhost:3000` in a browser. The app refreshes fleet metrics and locations every five seconds. The first start downloads the Java, Node, and Kafka images and can take several minutes.
 
 To start the already-built services in the background later, use `docker compose up -d`. To stop background services, use `docker compose down` from the same repository folder.
 
 The local Compose profile is an unauthenticated demo intended for a developer machine only. To use the secured API mode, set `FLEET_SECURITY_ENABLED=true` and `OIDC_ISSUER_URI` to your OIDC provider's issuer URL, then restart Compose. The identity provider must issue access tokens with a `tenant_id` claim and the `fleet.read` or `fleet.ingest` scope as appropriate. Protected API calls require `Authorization: Bearer <access-token>`. The dashboard currently targets the local demo profile; wiring interactive OIDC sign-in requires the chosen provider's client ID and redirect configuration.
 
-The dashboard opens directly into the local **Demo fleet** workspace; you do not need to enter a fleet or tenant identifier. API requests still carry an internal demo tenant ID so records stay separated. In a hosted login flow, that boundary should come from the signed-in user's account rather than a typed identifier.
+The local dashboard uses a fixed workspace for the generated 100,000-vehicle fleet; you do not need to type a tenant ID. The simulator streams synthetic data. It is clearly a local simulation and does not connect to real vehicles.
 
-The dashboard starts with no alerts because the database is empty. To create a synthetic idling alert for the demo, leave the services running, open a second Terminal window in the repository folder, and run:
+The initial snapshot may have no alerts until a vehicle reports continuous idling. To create a deterministic idling alert, leave the services running, open Terminal in the repository folder, and run:
 
 ```bash
 bash scripts/demo.sh
 ```
 
-The script submits two synthetic stationary events six minutes apart to the Demo fleet and waits up to 10 seconds for the consumer to make the alert visible; it does not use real vehicle data.
+The script submits two synthetic stationary events six minutes apart to the generated fleet and waits up to 10 seconds for the consumer to make the alert visible; it does not use real vehicle data.
 
 If you want to change local settings, create the optional environment file before starting Docker:
 
@@ -92,13 +106,13 @@ The sample password in `.env.example` is for a local demonstration only. Use a m
 
 The overview only counts vehicles that have sent telemetry; it is not a registered-vehicle inventory. A vehicle is shown as moving or idling only when an engine-on event has arrived within five minutes. Engine-off vehicles and vehicles with stale telemetry are called out separately. Coordinates are displayed as reported by the vehicle; a map/geocoding provider is not connected. Drivers, Routes & Dispatch, Maintenance, and Fuel Management have frontend previews with synthetic sample rows; these are not live fleet records. Reports provides hourly telemetry aggregates from ClickHouse, but needs runtime verification against the new Compose stack. The fuel figure is an assumption-based idling estimate, not measured savings.
 
-To generate a full 100,000-vehicle synthetic dataset locally, open **Terminal** in the project folder and run:
+To generate the fleet again, open **Terminal** in the project folder and run:
 
 ```bash
 bash scripts/generate_dataset.sh
 ```
 
-This uses Docker to run the Python generator, so you do not need to install Python. It writes 100,000 synthetic vehicle-catalog rows plus a repeatable telemetry sample covering those vehicle IDs under the project's `data/` folder. The event file may contain a few extra rows because it deliberately includes duplicate deliveries. Pass generator options after the script name, such as `--seed 7`, to change deterministic inputs. These generated files are local and are not checked into Git. To generate a smaller sample, use Python 3.11 or later after running `python -m pip install -e .` from the project folder.
+This uses Docker to run the Python generator, so you do not need to install Python. It writes exactly 100,000 vehicle catalog rows and 100,000 base events (plus intentional duplicate-delivery examples) for the `tenant-100k` workspace under the project's `data/` folder. `scripts/load_dataset.sh` publishes those events to Kafka for normal database processing. To keep positions changing, start Compose with `--profile live-simulator`; change its rate with `SIMULATOR_EVENTS_PER_SECOND` in `.env`. These generated files stay local and are not committed to GitHub; the scripts and seed are committed so another developer can recreate the same fleet. No data collection from a physical vehicle is performed.
 
 ## Repository map
 
@@ -108,6 +122,7 @@ This uses Docker to run the Python generator, so you do not need to install Pyth
 ├── backend/              # Spring Boot API and PostgreSQL migrations
 ├── frontend/             # React and TypeScript operations dashboard
 ├── src/fleetpulse/       # Python synthetic data generator
+├── scripts/              # 100K data generation/loading and live simulator
 ├── Dockerfile            # Multi-stage Java API container
 ├── infra/clickhouse/     # ClickHouse analytics schema and Kafka ingestion setup
 ├── compose.yaml          # Kafka + API + PostgreSQL + ClickHouse + dashboard local stack
@@ -136,6 +151,7 @@ This uses Docker to run the Python generator, so you do not need to install Pyth
 | `KAFKA_MAX_POLL_RECORDS` | `500` | Maximum records returned in one consumer poll |
 | `KAFKA_RETRY_ATTEMPTS` | `5` | Maximum total processing attempts before dead-letter routing |
 | `KAFKA_PRODUCER_ACK_TIMEOUT_MS` | `2000` | Maximum HTTP wait for a broker acknowledgement |
+| `SIMULATOR_EVENTS_PER_SECOND` | `100` | Local synthetic live-stream rate; not a challenge-scale performance claim |
 | `FLEET_SECURITY_ENABLED` | `false` in local Compose | Enable OAuth2/OIDC JWT validation; set true outside local demo |
 | `OIDC_ISSUER_URI` | unset | OIDC issuer URL required when API security is enabled |
 

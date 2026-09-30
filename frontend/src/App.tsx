@@ -1,48 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import PreviewWorkspace from "./PreviewWorkspace";
 import FleetMap from "./FleetMap";
-import type { PreviewColumn, PreviewRow } from "./PreviewWorkspace";
 
 // The local demo has one fleet workspace. In a hosted deployment this ID comes
 // from the authenticated user's tenant claim rather than a user-editable field.
-const DEMO_TENANT_ID = "tenant-demo";
-
-const driverColumns: PreviewColumn[] = [
-  { key: "driver", label: "Driver" }, { key: "vehicle", label: "Assigned vehicle" },
-  { key: "driving", label: "Driving today" }, { key: "safety", label: "Safety events" }, { key: "status", label: "Status" },
-];
-const driverRows: PreviewRow[] = [
-  { driver: "Driver 001", vehicle: "VH-DEMO-01", driving: "5h 12m", safety: "0", status: "On duty" },
-  { driver: "Driver 002", vehicle: "VH-DEMO-02", driving: "3h 48m", safety: "1 speeding event", status: "On duty" },
-  { driver: "Driver 003", vehicle: "VH-DEMO-03", driving: "6h 05m", safety: "0", status: "On break" },
-];
-const routeColumns: PreviewColumn[] = [
-  { key: "route", label: "Route" }, { key: "corridor", label: "Corridor" },
-  { key: "vehicles", label: "Vehicles" }, { key: "progress", label: "Progress" }, { key: "status", label: "Status" },
-];
-const routeRows: PreviewRow[] = [
-  { route: "Route 001", corridor: "North depot → Central hub", vehicles: "4 vehicles", progress: "72%", status: "In progress" },
-  { route: "Route 002", corridor: "East depot → Airport zone", vehicles: "3 vehicles", progress: "46%", status: "In progress" },
-  { route: "Route 003", corridor: "Central hub → South depot", vehicles: "2 vehicles", progress: "Scheduled", status: "Upcoming" },
-];
-const maintenanceColumns: PreviewColumn[] = [
-  { key: "vehicle", label: "Vehicle" }, { key: "service", label: "Service" },
-  { key: "due", label: "Due" }, { key: "odometer", label: "Odometer" }, { key: "status", label: "Status" },
-];
-const maintenanceRows: PreviewRow[] = [
-  { vehicle: "VH-DEMO-04", service: "Oil and filter", due: "Today", odometer: "48,210 km", status: "Overdue" },
-  { vehicle: "VH-DEMO-07", service: "Brake inspection", due: "In 3 days", odometer: "61,840 km", status: "Due soon" },
-  { vehicle: "VH-DEMO-02", service: "Tire rotation", due: "In 12 days", odometer: "32,440 km", status: "Scheduled" },
-];
-const fuelColumns: PreviewColumn[] = [
-  { key: "vehicle", label: "Vehicle" }, { key: "date", label: "Fill date" },
-  { key: "volume", label: "Volume" }, { key: "cost", label: "Cost" }, { key: "efficiency", label: "Efficiency" },
-];
-const fuelRows: PreviewRow[] = [
-  { vehicle: "VH-DEMO-01", date: "Today · 09:20", volume: "52.4 L", cost: "₹5,764", efficiency: "11.8 km/L" },
-  { vehicle: "VH-DEMO-03", date: "Today · 08:05", volume: "47.1 L", cost: "₹5,181", efficiency: "10.6 km/L" },
-  { vehicle: "VH-DEMO-05", date: "Yesterday · 17:42", volume: "60.0 L", cost: "₹6,600", efficiency: "12.1 km/L" },
-];
+const DEMO_TENANT_ID = "tenant-100k";
 
 type FleetAlert = {
   alert_id: string;
@@ -118,40 +79,6 @@ const emptyOverview: FleetOverview = {
   estimated_idle_fuel_litres: 0,
   latest_event_at: null,
 };
-
-function demoFleetSnapshot() {
-  const now = Date.now();
-  const coordinates = [
-    [13.0827, 80.2707], [13.0674, 80.2376], [13.0569, 80.2425], [13.0475, 80.2090],
-    [13.1067, 80.2206], [13.0358, 80.2445], [13.0878, 80.2785], [13.0125, 80.2140],
-    [13.1190, 80.2960], [13.0590, 80.1850], [12.9910, 80.2200], [13.0960, 80.2540],
-  ];
-  const statuses: FleetVehicle["status"][] = ["moving", "idling", "moving", "offline", "moving", "inactive", "moving", "idling", "moving", "offline", "moving", "moving"];
-  const vehicles = coordinates.map(([latitude, longitude], index): FleetVehicle => ({
-    tenant_id: DEMO_TENANT_ID,
-    vehicle_id: `VH-${String([2048, 7182, 3319, 4521, 4567, 7733, 8811, 9204, 1052, 4450, 6628, 5103][index])}`,
-    status: statuses[index],
-    last_seen_at: new Date(now - [2, 1, 7, 19, 3, 8, 1, 2, 4, 21, 1, 2][index] * 60_000).toISOString(),
-    latitude, longitude,
-    speed_kmh: statuses[index] === "moving" ? 24 + (index * 7) % 55 : 0,
-    open_alert_count: index === 1 || index === 7 ? 1 : 0,
-  }));
-  const alerts: FleetAlert[] = [
-    { alert_id: "AL-2048-01", tenant_id: DEMO_TENANT_ID, vehicle_id: "VH-7182", rule_version: "idle-v1", severity: "warning", episode_started_at: new Date(now - 42 * 60_000).toISOString(), last_observed_at: new Date(now - 1 * 60_000).toISOString(), idle_seconds: 2520, estimated_fuel_litres: 1.05, status: "open", resolved_at: null },
-    { alert_id: "AL-2048-02", tenant_id: DEMO_TENANT_ID, vehicle_id: "VH-9204", rule_version: "idle-v1", severity: "critical", episode_started_at: new Date(now - 68 * 60_000).toISOString(), last_observed_at: new Date(now - 2 * 60_000).toISOString(), idle_seconds: 4080, estimated_fuel_litres: 1.70, status: "open", resolved_at: null },
-    { alert_id: "AL-2048-03", tenant_id: DEMO_TENANT_ID, vehicle_id: "VH-3319", rule_version: "idle-v1", severity: "info", episode_started_at: new Date(now - 85 * 60_000).toISOString(), last_observed_at: new Date(now - 20 * 60_000).toISOString(), idle_seconds: 900, estimated_fuel_litres: 0.38, status: "resolved", resolved_at: new Date(now - 18 * 60_000).toISOString() },
-    { alert_id: "AL-2048-04", tenant_id: DEMO_TENANT_ID, vehicle_id: "VH-4567", rule_version: "idle-v1", severity: "warning", episode_started_at: new Date(now - 32 * 60_000).toISOString(), last_observed_at: new Date(now - 3 * 60_000).toISOString(), idle_seconds: 1920, estimated_fuel_litres: 0.80, status: "open", resolved_at: null },
-  ];
-  const overview: FleetOverview = { vehicles_seen: vehicles.length, moving_now: 7, idling_now: 2, inactive_now: 1, offline: 2, open_alerts: 3, estimated_idle_fuel_litres: 3.55, latest_event_at: new Date(now - 60_000).toISOString() };
-  const analytics = Array.from({ length: 24 }, (_, index): HourlyTelemetryPoint => ({
-    bucket_start_epoch_ms: Math.floor((now - (23 - index) * 60 * 60_000) / 3_600_000) * 3_600_000,
-    unique_events: 75 + (index * 47) % 180,
-    vehicles_seen: 8 + (index * 3) % 5,
-    idling_events: 5 + (index * 7) % 28,
-    moving_events: 35 + (index * 23) % 120,
-  }));
-  return { overview, vehicles, alerts, analytics };
-}
 
 function formatDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
@@ -272,12 +199,10 @@ export default function App() {
   const [alerts, setAlerts] = useState<FleetAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [usingSampleData, setUsingSampleData] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [analytics, setAnalytics] = useState<HourlyTelemetryPoint[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState("");
-  const [analyticsSampleData, setAnalyticsSampleData] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [vehicleHistory, setVehicleHistory] = useState<VehicleTelemetry[]>([]);
   const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false);
@@ -315,16 +240,12 @@ export default function App() {
       setVehicles(vehiclesJson.map(normalizeVehicle));
       setAlerts(alertsJson.map(normalizeAlert));
       setError("");
-      setUsingSampleData(false);
       setLastUpdated(new Date());
-    } catch {
-      const sample = demoFleetSnapshot();
-      setOverview(sample.overview);
-      setVehicles(sample.vehicles);
-      setAlerts(sample.alerts);
-      setError("");
-      setUsingSampleData(true);
-      setLastUpdated(new Date());
+    } catch (cause) {
+      setOverview(emptyOverview);
+      setVehicles([]);
+      setAlerts([]);
+      setError(cause instanceof Error ? cause.message : "Fleet API is unavailable.");
     } finally {
       setLoading(false);
     }
@@ -333,10 +254,10 @@ export default function App() {
   useEffect(() => {
     if (!demoSignedIn) return;
     void refresh();
-    if (usingSampleData || !settings.realTimeAlerts) return;
+    if (!settings.realTimeAlerts) return;
     const timer = window.setInterval(() => void refresh(), 5000);
     return () => window.clearInterval(timer);
-  }, [demoSignedIn, refresh, settings.realTimeAlerts, usingSampleData]);
+  }, [demoSignedIn, refresh, settings.realTimeAlerts]);
 
   useEffect(() => {
     const syncSection = () => setActiveSection(window.location.hash.slice(1) || "overview");
@@ -379,14 +300,11 @@ export default function App() {
         if (!active) return;
         setAnalytics(rows.map(normalizeAnalytics));
         setAnalyticsError("");
-        setAnalyticsSampleData(false);
       })
-      .catch(() => {
+      .catch((cause) => {
         if (!active) return;
-        const sample = demoFleetSnapshot();
-        setAnalyticsError("");
-        setAnalytics(sample.analytics);
-        setAnalyticsSampleData(true);
+        setAnalyticsError(cause instanceof Error ? cause.message : "Historical analytics are unavailable.");
+        setAnalytics([]);
       })
       .finally(() => {
         if (active) setAnalyticsLoading(false);
@@ -410,7 +328,7 @@ export default function App() {
         return response.json() as Promise<Array<Record<string, unknown>>>;
       })
       .then((events) => { if (active) setVehicleHistory(events.map(normalizeTelemetry)); })
-      .catch(() => { if (active) { setVehicleHistoryError(""); setVehicleHistory(demoFleetSnapshot().analytics.slice(0, 12).map((point, index) => ({ eventId: `DEMO-${selectedVehicleId}-${index + 1}`, observedAt: new Date(point.bucket_start_epoch_ms).toISOString(), latitude: selectedVehicle?.latitude ?? 13.0827, longitude: selectedVehicle?.longitude ?? 80.2707, speedKmh: selectedVehicle?.speed_kmh ?? 0, engineOn: selectedVehicle?.status !== "inactive", sequence: index + 1 }))); } })
+      .catch((cause) => { if (active) setVehicleHistoryError(cause instanceof Error ? cause.message : "Vehicle history is unavailable."); })
       .finally(() => { if (active) setVehicleHistoryLoading(false); });
     return () => { active = false; };
   }, [selectedVehicleId]);
@@ -458,10 +376,6 @@ export default function App() {
     reports: { title: "Reports", subtitle: "Download reports based on retained fleet telemetry." },
     decisions: { title: "Decision engine", subtitle: "Review the rules that turn vehicle events into operator alerts." },
     settings: { title: "Settings", subtitle: "Configure local demo preferences for this browser." },
-    drivers: { title: "Drivers", subtitle: "Driver roster and duty status preview." },
-    routes: { title: "Routes & dispatch", subtitle: "Planned fleet runs and route progress preview." },
-    maintenance: { title: "Maintenance", subtitle: "Upcoming service needs preview." },
-    fuel: { title: "Fuel management", subtitle: "Fuel use and spend preview." },
   };
   const page = sectionMeta[activeSection] ?? sectionMeta.overview;
   const updateRules = (next: DemoRule[]) => { setRules(next); localStorage.setItem("fleet-demo-rules", JSON.stringify(next)); };
@@ -501,15 +415,8 @@ export default function App() {
           <a className={`nav-item${activeSection === "alerts" ? " selected" : ""}`} href="#alerts"><span>♧</span>Alerts</a>
           <a className={`nav-item${activeSection === "analytics" ? " selected" : ""}`} href="#analytics"><span>▥</span>Analytics</a>
           <a className={`nav-item${activeSection === "vehicles" ? " selected" : ""}`} href="#vehicles"><span>▣</span>Vehicles <small>{overview.vehicles_seen}</small></a>
-          <a className={`nav-item${activeSection === "decisions" ? " selected" : ""}`} href="#decisions"><span>◇</span>Decisions</a>
           <a className={`nav-item${activeSection === "reports" ? " selected" : ""}`} href="#reports"><span>▤</span>Reports</a>
           <a className={`nav-item${activeSection === "settings" ? " selected" : ""}`} href="#settings"><span>⚙</span>Settings</a>
-          <div className="nav-divider" />
-          <div className="nav-caption">MORE FLEET WORKFLOWS</div>
-          <a className={`nav-item preview-nav${activeSection === "drivers" ? " selected" : ""}`} href="#drivers"><span>♙</span>Drivers <small>Preview</small></a>
-          <a className={`nav-item preview-nav${activeSection === "routes" ? " selected" : ""}`} href="#routes"><span>⌁</span>Routes &amp; dispatch <small>Preview</small></a>
-          <a className={`nav-item preview-nav${activeSection === "maintenance" ? " selected" : ""}`} href="#maintenance"><span>⚒</span>Maintenance <small>Preview</small></a>
-          <a className={`nav-item preview-nav${activeSection === "fuel" ? " selected" : ""}`} href="#fuel"><span>◉</span>Fuel management <small>Preview</small></a>
         </nav>
         <div className="sidebar-footer">Connected data.<br />Clear decisions.</div>
       </aside>
@@ -519,7 +426,7 @@ export default function App() {
           <div className="breadcrumb">Fleet Intelligence <span>/</span> {page.title}</div>
           <label className="global-search"><span aria-hidden="true">⌕</span><span className="sr-only">Search vehicles and alerts</span><input value={globalSearch} onChange={(event) => { setGlobalSearch(event.target.value); setVehicleFilter(event.target.value); setAlertSearch(event.target.value); }} placeholder="Search vehicles, alerts…" /></label>
           <div className="topbar-right">
-            <span className={`workspace-label${usingSampleData ? " sample-mode-label" : ""}`}>{usingSampleData ? "Demo fleet · sample data" : "Demo fleet · local"}</span>
+            <span className="workspace-label">Live synthetic fleet · local</span>
             <span className="avatar" aria-label="Demo operator">DO</span>
             <button className="sign-out-button" type="button" onClick={() => { sessionStorage.removeItem("fleet-demo-session"); setDemoSignedIn(false); }}>Sign out</button>
           </div>
@@ -538,13 +445,11 @@ export default function App() {
             </div>
           </section>
 
-          {usingSampleData && <div className="notice sample-notice" role="status"><strong>Sample demo data</strong><span>The fleet API is unavailable, so this screen is showing synthetic vehicles and alerts.</span></div>}
-          {analyticsSampleData && (activeSection === "analytics" || activeSection === "reports") && <div className="notice sample-notice" role="status"><strong>Sample analytics</strong><span>Historical values are synthetic until ClickHouse is connected.</span></div>}
 
           <section className="filters panel" aria-label="Fleet filters">
             <div className="active-fleet" aria-label="Selected fleet workspace">
               <span className="active-fleet-icon">▦</span>
-              <span><small>FLEET WORKSPACE</small><strong>Demo fleet</strong></span>
+              <span><small>FLEET WORKSPACE</small><strong>100K vehicle simulator</strong></span>
             </div>
             <label className="filter-control">
               <span>Search vehicles</span>
@@ -569,7 +474,7 @@ export default function App() {
 
           <section className="overview-charts" aria-label="Fleet health summary">
             <article className="chart-card panel">
-              <div className="chart-card-heading"><div><h2>Fleet health trend</h2><p>Hourly telemetry events · last 24 hours</p></div><span className="chart-chip">{analyticsSampleData ? "Sample" : "Live analytics"}</span></div>
+              <div className="chart-card-heading"><div><h2>Fleet health trend</h2><p>Hourly telemetry events · last 24 hours</p></div><span className="chart-chip">Telemetry data</span></div>
               <div className="line-chart-wrap"><div className="chart-y-labels"><span>{chartMax.toLocaleString()}</span><span>{Math.round(chartMax / 2).toLocaleString()}</span><span>0</span></div><svg className="fleet-line-chart" viewBox="0 0 700 180" role="img" aria-label="Hourly unique events and idling events"><path className="chart-gridline" d="M36 22H676 M36 85H676 M36 150H676"/><polyline className="event-line" points={eventTrendPath}/><polyline className="idle-line" points={idleTrendPath}/></svg></div>
               <div className="chart-x-labels"><span>24 hours ago</span><span>12 hours ago</span><span>Now</span></div>
               <div className="chart-legend"><span><i className="legend-blue" />Unique events</span><span><i className="legend-orange" />Idling samples</span></div>
@@ -694,18 +599,6 @@ export default function App() {
             <div className="settings-layout"><nav className="settings-nav" aria-label="Settings categories"><a className="selected" href="#settings-general">⚙ General</a><a href="#settings-notifications">♧ Notifications</a><a href="#settings-data">◈ Data sources</a><a href="#settings-security">♢ Security</a></nav><div className="settings-form" id="settings-general"><h3>General settings</h3><p>These preferences are saved locally in this browser.</p><div className="settings-fields"><label>Organization name<input value={settings.organization} onChange={(event) => updateSetting("organization", event.target.value)} /></label><label>Time zone<select value={settings.timeZone} onChange={(event) => updateSetting("timeZone", event.target.value)}><option value="Asia/Kolkata">(GMT+05:30) Asia/Kolkata</option><option value="UTC">(GMT+00:00) UTC</option><option value="America/Los_Angeles">(GMT-08:00) America/Los Angeles</option></select></label><label>Date format<select value={settings.dateFormat} onChange={(event) => updateSetting("dateFormat", event.target.value)}><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></label><label>Language<select value={settings.language} onChange={(event) => updateSetting("language", event.target.value)}><option>English</option></select></label></div><div className="settings-toggles"><label><span><strong>Real-time alert refresh</strong><small>Refresh fleet data automatically every five seconds</small></span><input type="checkbox" checked={settings.realTimeAlerts} onChange={(event) => updateSetting("realTimeAlerts", event.target.checked)} /></label><label><span><strong>Auto-acknowledge priority alerts</strong><small>Demo preference only; no acknowledgement API exists</small></span><input type="checkbox" checked={settings.autoAcknowledge} onChange={(event) => updateSetting("autoAcknowledge", event.target.checked)} /></label><label><span><strong>Show vehicle locations on map</strong><small>Display coordinates reported by telemetry</small></span><input type="checkbox" checked={settings.showLocations} onChange={(event) => updateSetting("showLocations", event.target.checked)} /></label></div><div className="settings-actions"><span role="status">{settingsSaved ? "Preferences saved in this browser." : ""}</span><button className="primary-button" type="button" onClick={() => { localStorage.setItem("fleet-demo-settings", JSON.stringify(settings)); setSettingsSaved(true); }}>Save changes</button></div></div></div>
           </section>
 
-          <div className="workflow-preview-heading">
-            <div><div className="eyebrow">FLEET OPERATIONS</div><h2>More fleet workflows</h2></div>
-            <p>Screen previews use clearly marked synthetic records until backend services are connected.</p>
-          </div>
-          <div className="workflow-preview-list">
-            <PreviewWorkspace id="drivers" title="Drivers" description="Driver roster, vehicle assignments, duty status, and safety signals." columns={driverColumns} rows={driverRows} />
-            <PreviewWorkspace id="routes" title="Routes & dispatch" description="Planned fleet runs, assigned vehicles, and route progress." columns={routeColumns} rows={routeRows} />
-            <PreviewWorkspace id="maintenance" title="Maintenance" description="Upcoming service needs and vehicle maintenance status." columns={maintenanceColumns} rows={maintenanceRows} />
-            <PreviewWorkspace id="fuel" title="Fuel management" description="Fuel fill records, spend, and vehicle efficiency." columns={fuelColumns} rows={fuelRows} />
-          </div>
-
-          <section className="roadmap-note panel"><span className="roadmap-mark">i</span><p><strong>Data status:</strong> Overview, Vehicles, and Alerts use the telemetry API when available and switch to labeled synthetic preview data when it is not. The fleet map displays reported coordinates. Reports use the analytics API when available; Decisions and Settings are browser-local demo controls. Drivers, Routes &amp; Dispatch, Maintenance, and Fuel Management use synthetic preview records.</p></section>
           <footer className="page-footer"><span>Fleet Intelligence Platform</span><span>Connected data. Clear decisions.</span></footer>
         </div>
       </main>
