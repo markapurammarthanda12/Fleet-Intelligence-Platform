@@ -429,13 +429,14 @@ tbody tr:hover { background: #fbfcff; }
 .map-vehicle-row { display: flex; width: 100%; align-items: center; gap: 8px; padding: 9px 12px; border: 0; border-top: 1px solid #f0f2f6; background: #fff; text-align: left; }
 .map-vehicle-row:hover { background: #f7f9fe; }
 .map-vehicle-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
-.map-vehicle-copy strong { color: #344760; font-size: 8px; }
+.map-vehicle-copy strong { overflow: hidden; color: #344760; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .map-vehicle-copy small { color: #929eae; font-size: 7px; }
 .map-status-tag, .rule-status { padding: 4px 6px; border-radius: 10px; background: #eef8f4; color: #238963; font-size: 7px; text-transform: capitalize; white-space: nowrap; }
 .tag-idling { background: #fff5e8; color: #ba7824; }.tag-offline, .tag-inactive { background: #f0f2f5; color: #77849a; }
 .fleet-map-marker-icon { border: 0; background: transparent; }
 .fleet-map-marker-icon > span { position: relative; display: grid; width: 25px; height: 25px; place-items: center; border: 2px solid #fff; border-radius: 50% 50% 50% 4px; background: var(--marker-color); box-shadow: 0 2px 6px rgb(18 39 68 / 32%); transform: rotate(-45deg); }
 .fleet-map-marker-icon i { width: 6px; height: 6px; border-radius: 50%; background: white; transform: rotate(45deg); }
+.fleet-map-cluster-icon > span { width: 32px; height: 32px; border-radius: 50%; background: #376be2; color: #fff; font: 700 11px 'DM Sans', sans-serif; transform: none; }
 .fleet-map-alert { color: #d94e56; font-weight: 700; }
 .leaflet-popup-content-wrapper { border-radius: 7px; }.leaflet-popup-content { font: 10px 'DM Sans', sans-serif; line-height: 1.7; }
 .decisions-screen, .settings-screen { display: none; overflow: hidden; margin-bottom: 14px; }
@@ -587,4 +588,19 @@ tbody tr:hover { background: #fbfcff; }
   .login-card { padding: 25px 22px; }
   .login-mobile-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 27px; color: #1b2a41; font-family: Manrope, sans-serif; font-size: 13px; }
   .login-mobile-brand .brand-mark { width: 31px; height: 31px; font-size: 18px; }
+}
+
+/* Tablet-width layout: match the sidebar grid width and avoid compressed cards. */
+@media (min-width: 701px) and (max-width: 900px) {
+  .sidebar { width: 190px; }
+  .content { padding-right: 18px; padding-left: 18px; }
+  .workspace .topbar { padding-right: 16px; padding-left: 16px; }
+  .global-search { width: min(220px, 27vw); }
+  .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .overview-metrics .metric-card small { font-size: 9px; }
+  .overview-charts { grid-template-columns: 1fr; }
+  .chart-card-heading h2 { font-size: 12px; }
+  .content .eyebrow { font-size: 9px; }
+  .content .subtitle { font-size: 11px; }
+  .nav-item { gap: 8px; font-size: 10px; }
 }
