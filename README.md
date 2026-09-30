@@ -19,7 +19,7 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 
 | Deliverable | Current status | What remains |
 |---|---|---|
-| Dockerized, portable system | Compose now defines Kafka, ClickHouse, PostgreSQL, API, and dashboard with persistent data volumes and health checks. Frontend production build passed locally; the updated Compose stack has not yet been rebuilt and verified. | Rebuild and verify all five containers; add deployment profiles and cloud portability evidence; local Kafka remains single-node |
+| Dockerized, portable system | Compose now defines Kafka, ClickHouse, PostgreSQL, API, and dashboard with persistent data volumes and health checks. Frontend production build and GitHub CI passed; the latest Docker Compose rebuild stalled in the API Maven package step and the updated five-service runtime remains unverified. | Rebuild and verify all five containers; add deployment profiles and cloud portability evidence; local Kafka remains single-node |
 | Real-time ingestion and alerting | The API waits for Kafka broker acknowledgement; keyed consumer persists idempotently, retries failures, and routes exhausted retries to a dead-letter topic | Measure end-to-end latency and burst behavior at challenge scale; test dead-letter replay |
 | Relational and high-volume data | PostgreSQL holds transactional events, vehicle state, and alerts. ClickHouse schema and Kafka ingestion path are implemented for analytical history. | Verify ClickHouse consumes broker events end to end; add fleet metadata and evaluate retention/partition settings |
 | User interface | Overview, Vehicles, Alerts, and Reports views plus Drivers, Routes & Dispatch, Maintenance, and Fuel Management previews are present. Preview data is explicitly labeled synthetic. | Connect preview screens to API workflows; verify Reports against the rebuilt stack; add alert acknowledgement, interactive login, and a map provider |
@@ -142,7 +142,7 @@ Fuel-use assumptions are illustrative and must be calibrated with documented fle
 
 ## Next milestones
 
-1. Rebuild the current Compose stack, verify ClickHouse consumes telemetry and Reports displays results, and troubleshoot Docker image build duration if it recurs.
+1. Diagnose the repeated Dockerized Maven package stall, then rebuild the Compose stack without deleting volumes. Verify all five services, ClickHouse telemetry consumption, Reports, and the dashboard at port 3000.
 2. Add multi-broker deployment, dead-letter replay tooling, and a justified high-volume telemetry store.
 3. Add observability and reproducible scale evidence for the hackathon targets.
 
