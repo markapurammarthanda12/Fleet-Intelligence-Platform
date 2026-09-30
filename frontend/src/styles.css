@@ -183,7 +183,7 @@ tbody tr:hover { background: #fbfcff; }
   .active-fleet { flex: 1 1 180px; }
   .filter-control { flex: 1 1 180px; }
 }
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .app-layout { display: block; }
   .sidebar { position: static; width: 100%; height: auto; padding: 10px 12px; border-right: 0; border-bottom: 1px solid #e8edf4; }
   .sidebar .brand { padding: 0 4px 9px; border: 0; }
@@ -195,6 +195,7 @@ tbody tr:hover { background: #fbfcff; }
   .content .page-heading { align-items: start; flex-direction: column; gap: 10px; padding: 20px 0 14px; }
   .heading-actions { width: 100%; justify-content: space-between; }
   .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metrics.overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .overview-metrics .metric-card { min-height: 105px; }
   .side-panels { grid-template-columns: 1fr; }
   .shell { padding: 0 14px 20px; }
