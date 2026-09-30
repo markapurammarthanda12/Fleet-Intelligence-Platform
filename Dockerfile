@@ -1,9 +1,10 @@
+# syntax=docker/dockerfile:1.7
 FROM maven:3-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY backend/pom.xml ./pom.xml
-RUN mvn -B -ntp dependency:go-offline
 COPY backend/src ./src
-RUN mvn -B -ntp -DskipTests package
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -ntp -DskipTests package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
