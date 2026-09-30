@@ -16,7 +16,7 @@ This is a hypothesis, not yet validated by customer interviews or operational da
 2. The service validates its timestamp, coordinates, speed, and event identity.
 3. A rule identifies sustained stationary engine-on activity.
 4. The platform evaluates the incoming event against explainable fleet rules and persists any resulting alert.
-5. The operations dashboard lets an operator compare vehicles, investigate, acknowledge, and export alerts; subsequent workflows can use the same event foundation for maintenance, utilisation, safety, and cost decisions.
+5. The operations dashboard lets an operator compare vehicles and investigate current or resolved alerts; subsequent workflows can use the same event foundation for maintenance, utilisation, safety, and cost decisions.
 
 ## Initial success measures
 

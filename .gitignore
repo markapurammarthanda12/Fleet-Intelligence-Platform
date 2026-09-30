@@ -9,4 +9,7 @@ data/*.csv
 coverage.xml
 htmlcov/
 target/
+node_modules/
+dist/
+*.tsbuildinfo
 .DS_Store

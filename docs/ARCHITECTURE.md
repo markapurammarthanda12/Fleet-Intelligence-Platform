@@ -6,11 +6,14 @@
 flowchart LR
   SIM[Python synthetic simulator] -->|JSON over HTTPS| API[Spring Boot ingestion API]
   API -->|validated, idempotent insert| PG[(PostgreSQL telemetry_events)]
+  API -->|event-time rule| RULE[Explainable idle alert rule]
+  RULE --> PG2[(PostgreSQL fleet_alerts and vehicle state)]
   PG --> QUERY[Bounded tenant and vehicle history query]
+  PG2 --> UI[React operations dashboard]
   API --> READY[Actuator readiness endpoint]
 ```
 
-Docker Compose currently starts the Spring Boot API and PostgreSQL. A Flyway migration creates the telemetry table and query index. PostgreSQL enforces uniqueness on `(tenant_id, event_id)`, so retries after a lost response do not create a second record for that tenant. The API validates coordinates, speed, identifiers, and event time before writing. This is a durable first ingestion slice; stream alerts, authentication, the dashboard, and high-volume benchmarks are not implemented yet.
+Docker Compose starts the Spring Boot API, PostgreSQL, and React dashboard. Flyway creates the telemetry, vehicle runtime state, and alert tables with bounded-query indexes. PostgreSQL enforces uniqueness on `(tenant_id, event_id)`, so retries after a lost response do not create a second record for that tenant. The API validates coordinates, speed, identifiers, and event time before writing. A versioned event-time rule opens and resolves idling alerts with a documented fuel estimate; late events are stored but do not rewind live vehicle state. The dashboard filters alerts by tenant and vehicle and refreshes automatically. Authentication, stream alerts, and high-volume benchmarks are not implemented yet.
 
 ## Intended challenge architecture
 
@@ -36,7 +39,7 @@ This target architecture is a design direction, not implemented infrastructure. 
 
 ## Container and deployment deliverable
 
-The current `Dockerfile` packages the API using a multi-stage Java build, and `compose.yaml` starts the API and PostgreSQL with a persistent volume and a database health check. This is only the first Docker milestone. The completed hackathon environment still needs the event broker, stream processor, telemetry store, simulator service, dashboard, deployment configuration, and end-to-end evidence. Production secrets must come from the deployment environment, not the local example file. The API is not yet protected by authentication or tenant authorization and is intended for local development only.
+The current `Dockerfile` packages the API using a multi-stage Java build, and `frontend/Dockerfile` builds the dashboard into an Nginx image. Compose starts those services with PostgreSQL, a persistent volume, and a database health check. The completed hackathon environment still needs the event broker, stream processor, high-volume telemetry store, simulator service integration, deployment configuration, and end-to-end evidence. Production secrets must come from the deployment environment, not the local example file. The API is not yet protected by authentication or tenant authorization and is intended for local development only.
 
 ## Data and consistency direction
 

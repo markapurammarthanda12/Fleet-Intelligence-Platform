@@ -23,9 +23,18 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-fleetintel}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-fleetintel}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-fleetintel_local_only}
+      IDLE_ALERT_SECONDS: ${IDLE_ALERT_SECONDS:-300}
+      FUEL_LITRES_PER_IDLE_HOUR: ${FUEL_LITRES_PER_IDLE_HOUR:-1.5}
     depends_on:
       postgres:
         condition: service_healthy
+
+  dashboard:
+    build: ./frontend
+    ports:
+      - "${DASHBOARD_PORT:-3000}:80"
+    depends_on:
+      - api
 
 volumes:
   postgres-data:

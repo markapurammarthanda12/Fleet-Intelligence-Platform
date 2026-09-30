@@ -34,4 +34,11 @@ public class TelemetryController {
             @RequestParam(defaultValue = "100") int limit) {
         return telemetryService.history(tenantId, vehicleId, limit);
     }
+
+    @GetMapping("/../alerts")
+    public List<AlertRecord> alerts(
+            @RequestParam(name = "tenant_id") String tenantId,
+            @RequestParam(defaultValue = "100") int limit) {
+        return telemetryService.alerts(tenantId, limit);
+    }
 }
