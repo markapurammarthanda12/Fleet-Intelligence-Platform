@@ -15,14 +15,14 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 
 | Deliverable | Current status | What remains |
 |---|---|---|
-| Dockerized, portable system | Compose defines Kafka, API, PostgreSQL, and dashboard; the refreshed stack is awaiting CI and local runtime verification | Verify the refreshed stack and add deployment profiles and cloud portability evidence |
+| Dockerized, portable system | GitHub Compose configuration and Kafka-backed tests pass; local Compose rebuild started but service health remains unverified | Confirm the refreshed stack on the Mac and add deployment profiles and cloud portability evidence |
 | Real-time ingestion and alerting | The API waits for Kafka broker acknowledgement; keyed consumer persists idempotently, retries failures, and routes exhausted retries to a dead-letter topic | Measure end-to-end latency and burst behavior at challenge scale; test dead-letter replay |
 | Relational and high-volume data | PostgreSQL telemetry, vehicle state, and alert tables are implemented | Add fleet metadata and a high-volume telemetry store after measuring workload |
 | User interface | Local dashboard with tenant and vehicle filters and automatic refresh | Add alert acknowledgement and authenticated API access |
-| Security, tests, and observability | Five Kafka/PostgreSQL API integration tests, simulator coverage tests, and the production dashboard build pass in GitHub Actions | Measure core coverage; add tenant-aware access controls, security checks, and metrics/logs/traces |
+| Security, tests, and observability | Five Kafka/PostgreSQL API integration tests, simulator coverage tests, and the production dashboard build pass in GitHub Actions; a retained-log replay scenario has been added and awaits CI | Measure core coverage; add tenant-aware access controls, security checks, and metrics/logs/traces |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
-Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, PostgreSQL, dashboard, persistent volumes, and health checks. The Kafka-backed stack has not yet been launched from this workspace; this is not a claim of cloud portability, high availability, or challenge-scale performance.
+Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, PostgreSQL, dashboard, persistent volumes, and health checks. A rebuild was started from Docker Desktop; it was still in the Maven dependency step at last observation, so service health is not verified. This is not a claim of cloud portability, high availability, or challenge-scale performance.
 
 The generator can create exactly 100,000 synthetic vehicle records. Generating at least 100,000 base telemetry events distributes at least one event to every generated vehicle. This proves deterministic dataset generation only; it does not claim that the current API sustains the challenge's 100,000 events/second target.
 

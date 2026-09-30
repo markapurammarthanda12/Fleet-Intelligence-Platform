@@ -8,6 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Properties;
+import java.util.UUID;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +34,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @Testcontainers
 class TelemetryApiIntegrationTest {
+    private static final String TELEMETRY_TOPIC = "fleet.telemetry.v1";
     @Container
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18-alpine")
             .withDatabaseName("fleetintel_test")
@@ -78,6 +87,32 @@ class TelemetryApiIntegrationTest {
                 "SELECT count(*) FROM telemetry_events WHERE tenant_id = 'tenant-demo' AND event_id = 'retry-event'",
                 Integer.class);
         org.assertj.core.api.Assertions.assertThat(storedEvents).isEqualTo(1);
+    }
+
+    @Test
+    void aNewConsumerGroupCanReplayTheRetainedTelemetryLog() throws Exception {
+        send("replay-event", "replay-vehicle", "2026-09-30T08:00:00Z", 12, 1);
+
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, "replay-verification-" + UUID.randomUUID());
+        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+
+        try (KafkaConsumer<String, String> replayConsumer = new KafkaConsumer<>(properties)) {
+            replayConsumer.subscribe(List.of(TELEMETRY_TOPIC));
+            org.awaitility.Awaitility.await()
+                    .atMost(Duration.ofSeconds(10))
+                    .untilAsserted(() -> {
+                        ConsumerRecords<String, String> records = replayConsumer.poll(Duration.ofMillis(250));
+                        boolean replayed = records.records(TELEMETRY_TOPIC).stream()
+                                .map(ConsumerRecord::value)
+                                .anyMatch(payload -> payload.contains("\"event_id\":\"replay-event\""));
+                        org.assertj.core.api.Assertions.assertThat(replayed).isTrue();
+                    });
+        }
     }
 
     @Test
