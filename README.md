@@ -17,14 +17,14 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 
 | Deliverable | Current status | What remains |
 |---|---|---|
-| Dockerized, portable system | Compose stack rebuilt and locally verified with Kafka, PostgreSQL, API, and dashboard running; API readiness reports `UP` | Add deployment profiles and cloud portability evidence; local Kafka remains single-node |
+| Dockerized, portable system | Docker Compose defines Kafka, PostgreSQL, API, dashboard, persistent volumes, and health checks. The stack was verified in an earlier run; the latest Dockerfile change has not yet been rebuilt successfully in this environment. | Rebuild and verify current services; add deployment profiles and cloud portability evidence; local Kafka remains single-node |
 | Real-time ingestion and alerting | The API waits for Kafka broker acknowledgement; keyed consumer persists idempotently, retries failures, and routes exhausted retries to a dead-letter topic | Measure end-to-end latency and burst behavior at challenge scale; test dead-letter replay |
 | Relational and high-volume data | PostgreSQL telemetry, vehicle state, and alert tables are implemented | Add fleet metadata and a high-volume telemetry store after measuring workload |
 | User interface | Fleet overview with telemetry-derived vehicle counts, current vehicle states, last reported coordinates, recent idling alerts, and automatic refresh | Add alert acknowledgement, authenticated API access, a map provider, and the other fleet workflows |
-| Security, tests, and observability | OIDC JWT validation, scope checks, tenant claim isolation, and an integration scenario for unauthenticated/cross-tenant access; simulator tests and dashboard build run in GitHub Actions | Configure a hosted identity provider; add mTLS, TLS, audit events, masking/erasure, security scans, coverage reporting, and metrics/logs/traces |
+| Security, tests, and observability | Hosted API code validates OIDC JWTs, checks `fleet.read` / `fleet.ingest` scopes and tenant claim isolation; GitHub Actions covers simulator, backend integration and frontend build | Configure a provider and secure browser sign-in; add mTLS, TLS, audit events, masking/erasure, security scans, coverage reporting, and metrics/logs/traces |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
-Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, PostgreSQL, dashboard, persistent volumes, and health checks. The development Mac stack was rebuilt and checked: all four services were running and the API readiness endpoint returned `UP`. This is not a claim of cloud portability, high availability, or challenge-scale performance.
+Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, PostgreSQL, dashboard, persistent volumes, and health checks. In an earlier local verification, all four services were running and API readiness returned `UP`. At the latest handoff, Docker socket access returned permission denied and the revised Dockerfile build had not completed. Re-check the current stack before relying on that earlier result. This is not a claim of cloud portability, high availability, or challenge-scale performance.
 
 The generator can create exactly 100,000 synthetic vehicle records. Generating at least 100,000 base telemetry events distributes at least one event to every generated vehicle. This proves deterministic dataset generation only; it does not claim that the current API sustains the challenge's 100,000 events/second target.
 
@@ -79,7 +79,7 @@ curl -i http://localhost:8080/v1/telemetry \
   -d '{"event_id":"sample-001","tenant_id":"tenant-00","vehicle_id":"vehicle-000001","observed_at":"2026-09-30T10:00:00Z","latitude":12.9716,"longitude":77.5946,"speed_kmh":0,"engine_on":true,"sequence":1}'
 ```
 
-The API returns `202 Accepted` only after Kafka acknowledges the event; the response means `queued`, not yet written to PostgreSQL. A partition key of `tenant_id:vehicle_id` keeps one vehicle's stream on one partition. The consumer persists events and evaluates alerts, with PostgreSQL uniqueness protecting against duplicate delivery. Once consecutive event timestamps show an engine-on vehicle stationary for at least `IDLE_ALERT_SECONDS`, the API consumer opens an explainable idling alert; later movement resolves it. List a tenant's alerts with `GET /v1/alerts?tenant_id=tenant-00`. History and alert queries are limited to 500 rows. Authentication and tenant authorization are not implemented yet, so the API is for local development only.
+The API returns `202 Accepted` only after Kafka acknowledges the event; the response means `queued`, not yet written to PostgreSQL. A partition key of `tenant_id:vehicle_id` keeps one vehicle's stream on one partition. The consumer persists events and evaluates alerts, with PostgreSQL uniqueness protecting against duplicate delivery. Once consecutive event timestamps show an engine-on vehicle stationary for at least `IDLE_ALERT_SECONDS`, the API consumer opens an explainable idling alert; later movement resolves it. List a tenant's alerts with `GET /v1/alerts?tenant_id=tenant-00`. History and alert queries are limited to 500 rows. Hosted API authentication and tenant authorization are implemented in code with OIDC JWT validation, scopes, and a signed `tenant_id` check. Local Compose intentionally disables that security for the demo. The dashboard does not yet provide interactive OIDC sign-in, so the secured hosted API workflow is not complete end to end.
 
 Local Kafka stores seven days of topic data across 12 partitions. For a replay of retained events, stop the API consumer, reset its group offset, then start it again. PostgreSQL's event ID uniqueness makes reprocessed events safe from duplicate inserts. The local broker is a single instance with replication factor 1; a shared environment must use a multi-broker cluster with replication factor 3 and minimum in-sync replicas 2 to remove that broker as a single point of failure. The local setup uses plaintext Kafka and is not production-secure.
 
@@ -135,7 +135,7 @@ Fuel-use assumptions are illustrative and must be calibrated with documented fle
 
 ## Next milestones
 
-1. Verify local compose behavior and add alert acknowledgement, authentication, and tenant-aware authorization.
+1. Rebuild and verify the current Docker Compose stack; add alert acknowledgement and wire the dashboard to a selected OIDC provider.
 2. Add multi-broker deployment, dead-letter replay tooling, and a justified high-volume telemetry store.
 3. Add observability and reproducible scale evidence for the hackathon targets.
 
