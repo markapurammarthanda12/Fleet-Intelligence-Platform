@@ -2,6 +2,7 @@ package com.fleetintelligence.telemetry;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -25,15 +26,20 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
+@TestPropertySource(properties = "fleet.security.enabled=true")
 class TelemetryApiIntegrationTest {
     private static final String TELEMETRY_TOPIC = "fleet.telemetry.v1";
     @Container
@@ -53,6 +59,9 @@ class TelemetryApiIntegrationTest {
 
     @Autowired
     private TelemetryService telemetryService;
+
+    @MockBean
+    private JwtDecoder jwtDecoder;
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
@@ -121,7 +130,7 @@ class TelemetryApiIntegrationTest {
         send("idle-start", "idle-vehicle", "2026-09-30T08:00:00Z", 0, 1);
         send("idle-after-threshold", "idle-vehicle", "2026-09-30T08:06:00Z", 0, 2);
 
-        mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo"))
+        mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo").with(fleetRead("tenant-demo")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].vehicle_id").value("idle-vehicle"))
                 .andExpect(jsonPath("$[0].status").value("open"))
@@ -132,7 +141,7 @@ class TelemetryApiIntegrationTest {
 
         send("vehicle-moved", "idle-vehicle", "2026-09-30T08:07:00Z", 25, 3);
 
-        mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo"))
+        mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo").with(fleetRead("tenant-demo")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].status").value("resolved"))
                 .andExpect(jsonPath("$[0].resolved_at").isNotEmpty());
@@ -145,7 +154,7 @@ class TelemetryApiIntegrationTest {
         send("critical-start", "critical-vehicle", "2026-09-30T08:00:00Z", 0, 3);
         send("critical-threshold", "critical-vehicle", "2026-09-30T08:16:00Z", 0, 4);
 
-        mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo"))
+        mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo").with(fleetRead("tenant-demo")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].vehicle_id").value("critical-vehicle"))
                 .andExpect(jsonPath("$[0].severity").value("critical"))
@@ -158,7 +167,7 @@ class TelemetryApiIntegrationTest {
         send("late-threshold", "late-vehicle", "2026-09-30T08:06:00Z", 0, 2);
         send("late-arrival", "late-vehicle", "2026-09-30T08:02:00Z", 20, 3);
 
-        mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo"))
+        mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo").with(fleetRead("tenant-demo")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].status").value("open"))
                 .andExpect(jsonPath("$[0].last_observed_at").value("2026-09-30T08:06:00Z"));
@@ -174,7 +183,8 @@ class TelemetryApiIntegrationTest {
         String invalidEvent = event("bad-coordinates", "invalid-vehicle", "2026-09-30T08:00:00Z", 0, 1)
                 .replace("\"latitude\":12.9716", "\"latitude\":95.0");
 
-        mockMvc.perform(post("/v1/telemetry").contentType("application/json").content(invalidEvent))
+        mockMvc.perform(post("/v1/telemetry").with(fleetIngest("tenant-demo"))
+                        .contentType("application/json").content(invalidEvent))
                 .andExpect(status().isBadRequest());
 
         Integer storedEvents = jdbcTemplate.queryForObject(
@@ -187,7 +197,7 @@ class TelemetryApiIntegrationTest {
         String observedAt = Instant.now().minusSeconds(20).toString();
         send("overview-moving", "overview-vehicle", observedAt, 42, 1);
 
-        mockMvc.perform(get("/v1/fleet/overview").param("tenant_id", "tenant-demo"))
+        mockMvc.perform(get("/v1/fleet/overview").param("tenant_id", "tenant-demo").with(fleetRead("tenant-demo")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.vehicles_seen").value(1))
                 .andExpect(jsonPath("$.moving_now").value(1))
@@ -195,21 +205,21 @@ class TelemetryApiIntegrationTest {
                 .andExpect(jsonPath("$.open_alerts").value(0))
                 .andExpect(jsonPath("$.latest_event_at").isNotEmpty());
 
-        mockMvc.perform(get("/v1/vehicles").param("tenant_id", "tenant-demo"))
+        mockMvc.perform(get("/v1/vehicles").param("tenant_id", "tenant-demo").with(fleetRead("tenant-demo")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].vehicle_id").value("overview-vehicle"))
                 .andExpect(jsonPath("$[0].status").value("moving"))
                 .andExpect(jsonPath("$[0].latitude").value(12.9716))
                 .andExpect(jsonPath("$[0].longitude").value(77.5946));
 
-        mockMvc.perform(get("/v1/fleet/overview").param("tenant_id", "another-tenant"))
+        mockMvc.perform(get("/v1/fleet/overview").param("tenant_id", "another-tenant").with(fleetRead("another-tenant")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.vehicles_seen").value(0));
     }
 
     private void send(String eventId, String vehicleId, String observedAt, int speed, int sequence)
             throws Exception {
-        mockMvc.perform(post("/v1/telemetry")
+        mockMvc.perform(post("/v1/telemetry").with(fleetIngest("tenant-demo"))
                         .contentType("application/json")
                         .content(event(eventId, vehicleId, observedAt, speed, sequence)))
                 .andExpect(status().isAccepted())
@@ -226,6 +236,36 @@ class TelemetryApiIntegrationTest {
                             eventId);
                     org.assertj.core.api.Assertions.assertThat(count).isEqualTo(1);
                 });
+    }
+
+    @Test
+    void fleetApiRequiresBearerAuthenticationAndPreventsCrossTenantReads() throws Exception {
+        mockMvc.perform(get("/v1/fleet/overview").param("tenant_id", "tenant-demo"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/v1/fleet/overview").param("tenant_id", "another-tenant")
+                        .with(fleetRead("tenant-demo")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/v1/fleet/overview").param("tenant_id", "tenant-demo")
+                        .with(jwt().jwt(token -> token.claim("tenant_id", "tenant-demo"))))
+                .andExpect(status().isForbidden());
+
+        String crossTenantEvent = event("cross-tenant-ingest", "vehicle-1", "2026-09-30T08:00:00Z", 0, 1)
+                .replace("\"tenant_id\":\"tenant-demo\"", "\"tenant_id\":\"tenant-other\"");
+        mockMvc.perform(post("/v1/telemetry").with(fleetIngest("tenant-demo"))
+                        .contentType("application/json").content(crossTenantEvent))
+                .andExpect(status().isForbidden());
+    }
+
+    private org.springframework.test.web.servlet.request.RequestPostProcessor fleetRead(String tenantId) {
+        return jwt().jwt(token -> token.claim("tenant_id", tenantId))
+                .authorities(new SimpleGrantedAuthority("SCOPE_fleet.read"));
+    }
+
+    private org.springframework.test.web.servlet.request.RequestPostProcessor fleetIngest(String tenantId) {
+        return jwt().jwt(token -> token.claim("tenant_id", tenantId))
+                .authorities(new SimpleGrantedAuthority("SCOPE_fleet.ingest"));
     }
 
     private String event(String eventId, String vehicleId, String observedAt, int speed, int sequence) {

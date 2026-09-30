@@ -9,6 +9,7 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 - The Python simulator produces a repeatable 100,000-record synthetic vehicle catalog and synthetic events with delayed and duplicate deliveries.
 - Docker Compose runs Apache Kafka, the API, PostgreSQL, and an operator dashboard, with persistent broker/database volumes and service health checks.
 - The API exposes readiness through Spring Boot Actuator and supports bounded telemetry history queries.
+- Hosted API mode validates OAuth2/OIDC JWTs against a configured issuer, checks `fleet.read` / `fleet.ingest` scopes, and rejects tenant IDs that do not match the signed `tenant_id` claim. Local Compose explicitly selects an unauthenticated demo mode for quick local use.
 - Fleet overview and vehicle-list APIs derive counts, current status, last seen time, and last reported coordinates from each tenant's latest telemetry; the dashboard uses these APIs for its overview.
 - Idling alerts escalate from `warning` to `critical` after 15 minutes by default and are returned with open, critical alerts first. This is a demo policy configurable with `IDLE_CRITICAL_SECONDS`.
 
@@ -20,7 +21,7 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 | Real-time ingestion and alerting | The API waits for Kafka broker acknowledgement; keyed consumer persists idempotently, retries failures, and routes exhausted retries to a dead-letter topic | Measure end-to-end latency and burst behavior at challenge scale; test dead-letter replay |
 | Relational and high-volume data | PostgreSQL telemetry, vehicle state, and alert tables are implemented | Add fleet metadata and a high-volume telemetry store after measuring workload |
 | User interface | Fleet overview with telemetry-derived vehicle counts, current vehicle states, last reported coordinates, recent idling alerts, and automatic refresh | Add alert acknowledgement, authenticated API access, a map provider, and the other fleet workflows |
-| Security, tests, and observability | Six Kafka/PostgreSQL API integration tests, simulator coverage tests, and the production dashboard build pass in GitHub Actions | Measure core coverage; add tenant-aware access controls, security checks, and metrics/logs/traces |
+| Security, tests, and observability | OIDC JWT validation, scope checks, tenant claim isolation, and an integration scenario for unauthenticated/cross-tenant access; simulator tests and dashboard build run in GitHub Actions | Configure a hosted identity provider; add mTLS, TLS, audit events, masking/erasure, security scans, coverage reporting, and metrics/logs/traces |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
 Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, PostgreSQL, dashboard, persistent volumes, and health checks. The development Mac stack was rebuilt and checked: all four services were running and the API readiness endpoint returned `UP`. This is not a claim of cloud portability, high availability, or challenge-scale performance.
@@ -51,6 +52,8 @@ Requires Docker Desktop. You do not need to install Java, Maven, Node.js, Spring
 5. Open `http://localhost:3000` in a browser. The first start downloads the Java, Node, and Kafka images and can take several minutes. Leave the Terminal window open while using the app. Press `Control + C` there to stop it.
 
 To start the already-built services in the background later, use `docker compose up -d`. To stop background services, use `docker compose down` from the same repository folder.
+
+The local Compose profile is an unauthenticated demo intended for a developer machine only. To use the secured API mode, set `FLEET_SECURITY_ENABLED=true` and `OIDC_ISSUER_URI` to your OIDC provider's issuer URL, then restart Compose. The identity provider must issue access tokens with a `tenant_id` claim and the `fleet.read` or `fleet.ingest` scope as appropriate. Protected API calls require `Authorization: Bearer <access-token>`. The dashboard currently targets the local demo profile; wiring interactive OIDC sign-in requires the chosen provider's client ID and redirect configuration.
 
 The dashboard starts with no alerts because the database is empty. To create a synthetic idling alert for the demo, leave the services running, open a second Terminal window in the repository folder, and run:
 
@@ -125,6 +128,8 @@ This uses Docker to run the Python generator, so you do not need to install Pyth
 | `KAFKA_MAX_POLL_RECORDS` | `500` | Maximum records returned in one consumer poll |
 | `KAFKA_RETRY_ATTEMPTS` | `5` | Maximum total processing attempts before dead-letter routing |
 | `KAFKA_PRODUCER_ACK_TIMEOUT_MS` | `2000` | Maximum HTTP wait for a broker acknowledgement |
+| `FLEET_SECURITY_ENABLED` | `false` in local Compose | Enable OAuth2/OIDC JWT validation; set true outside local demo |
+| `OIDC_ISSUER_URI` | unset | OIDC issuer URL required when API security is enabled |
 
 Fuel-use assumptions are illustrative and must be calibrated with documented fleet-specific data before presenting savings as measured results.
 
@@ -135,3 +140,5 @@ Fuel-use assumptions are illustrative and must be calibrated with documented fle
 3. Add observability and reproducible scale evidence for the hackathon targets.
 
 See [the project brief](docs/PROJECT_BRIEF.md) and [architecture notes](docs/ARCHITECTURE.md).
+
+For a complete continuation brief—including the challenge acceptance criteria, prior decisions, verified state, known gaps, and next steps for a new agent—read [the agent handoff guide](docs/AGENT_HANDOFF.md).

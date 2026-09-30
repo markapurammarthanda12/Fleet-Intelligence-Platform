@@ -43,7 +43,7 @@ This target architecture is a design direction, not implemented infrastructure. 
 
 ## Container and deployment deliverable
 
-The current `Dockerfile` packages the API using a multi-stage Java build, and `frontend/Dockerfile` builds the dashboard into an Nginx image. Compose now includes an Apache Kafka broker with persistent storage, PostgreSQL, API, and dashboard. The local broker is deliberately single-node and plaintext; the completed shared environment still needs multi-broker deployment, TLS, authentication and authorization, high-volume telemetry storage, cloud deployment configuration, and scale evidence. Production secrets must come from the deployment environment, not the local example file. The API is not yet protected by authentication or tenant authorization and is intended for local development only.
+The current `Dockerfile` packages the API using a multi-stage Java build, and `frontend/Dockerfile` builds the dashboard into an Nginx image. Compose includes an Apache Kafka broker with persistent storage, PostgreSQL, API, and dashboard. Hosted API mode validates OAuth2/OIDC access tokens against `OIDC_ISSUER_URI`, requires `fleet.read` or `fleet.ingest` scope, and checks the signed `tenant_id` claim against the requested tenant or telemetry payload. Local Compose defaults to `FLEET_SECURITY_ENABLED=false` for a developer demo; it is not safe for shared exposure. The dashboard does not yet implement interactive OIDC login. The local broker is deliberately single-node and plaintext; multi-broker deployment, TLS, audit and privacy controls, high-volume telemetry storage, cloud deployment configuration, and scale evidence remain outstanding. Production secrets must come from the deployment environment, not the local example file.
 
 ## Data and consistency direction
 
@@ -51,6 +51,10 @@ The current `Dockerfile` packages the API using a multi-stage Java build, and `f
 - Raw telemetry: the implemented Kafka topic is partitioned and retained for seven days; a time-series or columnar store remains a target for measured high-volume workloads.
 - Historical aggregates: object storage in a columnar format for economical batch analysis.
 - Cache and vector store: defer unless a measured access pattern or grounded natural-language workflow needs them.
+
+## API identity and tenant boundaries
+
+When `FLEET_SECURITY_ENABLED=true`, the API is an OAuth2 resource server. It validates JWT signatures, issuer, and expiry using the issuer metadata/JWKS from `OIDC_ISSUER_URI`; read endpoints require `fleet.read`, ingestion requires `fleet.ingest`, and each request's `tenant_id` must exactly match the signed token claim. A JWT with no matching tenant claim is denied. Compose sets security false only for local demo convenience. This config does not provide a hosted identity provider, browser login, device mTLS, or audit logging; those remain deployment and product work.
 
 ## Capacity baseline from the brief
 
