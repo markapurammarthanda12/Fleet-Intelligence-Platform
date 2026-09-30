@@ -194,7 +194,13 @@ export default function App() {
     });
     fetch(`/api/v1/analytics/telemetry/hourly?${query.toString()}`, { headers: { Accept: "application/json" } })
       .then(async (response) => {
-        if (!response.ok) throw new Error(`Historical analytics returned ${response.status}.`);
+        if (response.status === 404) {
+          throw new Error("Reports are not enabled in the currently running API. Update the local application image to enable this section.");
+        }
+        if (response.status === 503) {
+          throw new Error("The historical analytics store is not ready. Check that ClickHouse is running.");
+        }
+        if (!response.ok) throw new Error(`Reports could not be loaded (HTTP ${response.status}).`);
         return response.json() as Promise<HourlyTelemetryPoint[]>;
       })
       .then((rows) => {
