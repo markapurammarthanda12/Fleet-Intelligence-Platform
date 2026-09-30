@@ -27,6 +27,25 @@ services:
       timeout: 5s
       retries: 12
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8-alpine
+    environment:
+      CLICKHOUSE_DB: fleet_analytics
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-fleetintel}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-fleetintel_local_only}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./infra/clickhouse/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user $${CLICKHOUSE_USER} --password $${CLICKHOUSE_PASSWORD} --query 'SELECT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+    depends_on:
+      kafka:
+        condition: service_healthy
+
   postgres:
     image: postgres:18-alpine
     environment:
@@ -53,6 +72,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-fleetintel_local_only}
       FLEET_SECURITY_ENABLED: ${FLEET_SECURITY_ENABLED:-false}
       OIDC_ISSUER_URI: ${OIDC_ISSUER_URI:-}
+      CLICKHOUSE_HTTP_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-fleetintel}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-fleetintel_local_only}
       IDLE_ALERT_SECONDS: ${IDLE_ALERT_SECONDS:-300}
       IDLE_CRITICAL_SECONDS: ${IDLE_CRITICAL_SECONDS:-900}
       FUEL_LITRES_PER_IDLE_HOUR: ${FUEL_LITRES_PER_IDLE_HOUR:-1.5}
@@ -70,6 +92,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      clickhouse:
+        condition: service_healthy
 
   dashboard:
     build: ./frontend
@@ -81,3 +105,4 @@ services:
 volumes:
   postgres-data:
   kafka-data:
+  clickhouse-data:

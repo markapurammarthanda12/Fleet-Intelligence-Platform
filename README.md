@@ -7,24 +7,26 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 - A Java 21 / Spring Boot API validates connected-vehicle telemetry and publishes it to a partitioned Kafka topic; a consumer persists events and evaluates idling alerts in PostgreSQL.
 - PostgreSQL uniqueness on `(tenant_id, event_id)` makes retries idempotent; duplicate submissions are acknowledged without a second row.
 - The Python simulator produces a repeatable 100,000-record synthetic vehicle catalog and synthetic events with delayed and duplicate deliveries.
-- Docker Compose runs Apache Kafka, the API, PostgreSQL, and an operator dashboard, with persistent broker/database volumes and service health checks.
+- Docker Compose defines Apache Kafka, ClickHouse, the API, PostgreSQL, and an operator dashboard, with persistent service volumes and health checks.
 - The API exposes readiness through Spring Boot Actuator and supports bounded telemetry history queries.
 - Hosted API mode validates OAuth2/OIDC JWTs against a configured issuer, checks `fleet.read` / `fleet.ingest` scopes, and rejects tenant IDs that do not match the signed `tenant_id` claim. Local Compose explicitly selects an unauthenticated demo mode for quick local use.
 - Fleet overview and vehicle-list APIs derive counts, current status, last seen time, and last reported coordinates from each tenant's latest telemetry; the dashboard uses these APIs for its overview.
+- The dashboard includes Overview, Vehicles, Alerts, Reports, Drivers, Routes & Dispatch, Maintenance, and Fuel Management. Driver/route/maintenance/fuel screens are clearly marked synthetic previews, not connected fleet records. The local demo workspace is selected automatically; operators do not type an internal tenant ID.
 - Idling alerts escalate from `warning` to `critical` after 15 minutes by default and are returned with open, critical alerts first. This is a demo policy configurable with `IDLE_CRITICAL_SECONDS`.
+- Kafka also feeds an independent ClickHouse Kafka Engine/materialized-view path for historical analytics. `GET /v1/analytics/telemetry/hourly` returns hourly event, vehicle, idling, and moving counts for a tenant and bounded time range. The dashboard Reports view uses this endpoint.
 
 ## Hackathon deliverables and current status
 
 | Deliverable | Current status | What remains |
 |---|---|---|
-| Dockerized, portable system | Docker Compose defines Kafka, PostgreSQL, API, dashboard, persistent volumes, and health checks. The stack was verified in an earlier run; the latest Dockerfile change has not yet been rebuilt successfully in this environment. | Rebuild and verify current services; add deployment profiles and cloud portability evidence; local Kafka remains single-node |
+| Dockerized, portable system | Compose now defines Kafka, ClickHouse, PostgreSQL, API, and dashboard with persistent data volumes and health checks. Frontend production build passed locally; the updated Compose stack has not yet been rebuilt and verified. | Rebuild and verify all five containers; add deployment profiles and cloud portability evidence; local Kafka remains single-node |
 | Real-time ingestion and alerting | The API waits for Kafka broker acknowledgement; keyed consumer persists idempotently, retries failures, and routes exhausted retries to a dead-letter topic | Measure end-to-end latency and burst behavior at challenge scale; test dead-letter replay |
-| Relational and high-volume data | PostgreSQL telemetry, vehicle state, and alert tables are implemented | Add fleet metadata and a high-volume telemetry store after measuring workload |
-| User interface | Fleet overview with telemetry-derived vehicle counts, current vehicle states, last reported coordinates, recent idling alerts, and automatic refresh | Add alert acknowledgement, authenticated API access, a map provider, and the other fleet workflows |
-| Security, tests, and observability | Hosted API code validates OIDC JWTs, checks `fleet.read` / `fleet.ingest` scopes and tenant claim isolation; GitHub Actions covers simulator, backend integration and frontend build | Configure a provider and secure browser sign-in; add mTLS, TLS, audit events, masking/erasure, security scans, coverage reporting, and metrics/logs/traces |
+| Relational and high-volume data | PostgreSQL holds transactional events, vehicle state, and alerts. ClickHouse schema and Kafka ingestion path are implemented for analytical history. | Verify ClickHouse consumes broker events end to end; add fleet metadata and evaluate retention/partition settings |
+| User interface | Overview, Vehicles, Alerts, and Reports views plus Drivers, Routes & Dispatch, Maintenance, and Fuel Management previews are present. Preview data is explicitly labeled synthetic. | Connect preview screens to API workflows; verify Reports against the rebuilt stack; add alert acknowledgement, interactive login, and a map provider |
+| Security, tests, and observability | OIDC JWT validation, scope checks, tenant claim isolation, and an integration scenario for unauthenticated/cross-tenant access; simulator tests and dashboard build run in GitHub Actions | Configure a hosted identity provider; add mTLS, TLS, audit events, masking/erasure, security scans, coverage reporting, and metrics/logs/traces |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
-Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, PostgreSQL, dashboard, persistent volumes, and health checks. In an earlier local verification, all four services were running and API readiness returned `UP`. At the latest handoff, Docker socket access returned permission denied and the revised Dockerfile build had not completed. Re-check the current stack before relying on that earlier result. This is not a claim of cloud portability, high availability, or challenge-scale performance.
+Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, ClickHouse, PostgreSQL, dashboard, persistent volumes, and health checks. A prior four-service local stack was observed running and the API readiness endpoint returned `UP`; the current five-service version still needs a rebuild and runtime check. This is not a claim of cloud portability, high availability, or challenge-scale performance.
 
 The generator can create exactly 100,000 synthetic vehicle records. Generating at least 100,000 base telemetry events distributes at least one event to every generated vehicle. This proves deterministic dataset generation only; it does not claim that the current API sustains the challenge's 100,000 events/second target.
 
@@ -55,13 +57,15 @@ To start the already-built services in the background later, use `docker compose
 
 The local Compose profile is an unauthenticated demo intended for a developer machine only. To use the secured API mode, set `FLEET_SECURITY_ENABLED=true` and `OIDC_ISSUER_URI` to your OIDC provider's issuer URL, then restart Compose. The identity provider must issue access tokens with a `tenant_id` claim and the `fleet.read` or `fleet.ingest` scope as appropriate. Protected API calls require `Authorization: Bearer <access-token>`. The dashboard currently targets the local demo profile; wiring interactive OIDC sign-in requires the chosen provider's client ID and redirect configuration.
 
+The dashboard opens directly into the local **Demo fleet** workspace; you do not need to enter a fleet or tenant identifier. API requests still carry an internal demo tenant ID so records stay separated. In a hosted login flow, that boundary should come from the signed-in user's account rather than a typed identifier.
+
 The dashboard starts with no alerts because the database is empty. To create a synthetic idling alert for the demo, leave the services running, open a second Terminal window in the repository folder, and run:
 
 ```bash
 bash scripts/demo.sh
 ```
 
-Then set the dashboard's **Fleet / tenant** field to `tenant-demo`. The script submits two synthetic stationary events six minutes apart and waits up to 10 seconds for the consumer to make the alert visible; it does not use real vehicle data.
+The script submits two synthetic stationary events six minutes apart to the Demo fleet and waits up to 10 seconds for the consumer to make the alert visible; it does not use real vehicle data.
 
 If you want to change local settings, create the optional environment file before starting Docker:
 
@@ -79,13 +83,13 @@ curl -i http://localhost:8080/v1/telemetry \
   -d '{"event_id":"sample-001","tenant_id":"tenant-00","vehicle_id":"vehicle-000001","observed_at":"2026-09-30T10:00:00Z","latitude":12.9716,"longitude":77.5946,"speed_kmh":0,"engine_on":true,"sequence":1}'
 ```
 
-The API returns `202 Accepted` only after Kafka acknowledges the event; the response means `queued`, not yet written to PostgreSQL. A partition key of `tenant_id:vehicle_id` keeps one vehicle's stream on one partition. The consumer persists events and evaluates alerts, with PostgreSQL uniqueness protecting against duplicate delivery. Once consecutive event timestamps show an engine-on vehicle stationary for at least `IDLE_ALERT_SECONDS`, the API consumer opens an explainable idling alert; later movement resolves it. List a tenant's alerts with `GET /v1/alerts?tenant_id=tenant-00`. History and alert queries are limited to 500 rows. Hosted API authentication and tenant authorization are implemented in code with OIDC JWT validation, scopes, and a signed `tenant_id` check. Local Compose intentionally disables that security for the demo. The dashboard does not yet provide interactive OIDC sign-in, so the secured hosted API workflow is not complete end to end.
+The API returns `202 Accepted` only after Kafka acknowledges the event; the response means `queued`, not yet written to PostgreSQL. A partition key of `tenant_id:vehicle_id` keeps one vehicle's stream on one partition. The consumer persists events and evaluates alerts, with PostgreSQL uniqueness protecting against duplicate delivery. Once consecutive event timestamps show an engine-on vehicle stationary for at least `IDLE_ALERT_SECONDS`, the API consumer opens an explainable idling alert; later movement resolves it. List a tenant's alerts with `GET /v1/alerts?tenant_id=tenant-00`. History and alert queries are limited to 500 rows. Hosted API mode validates OIDC JWTs, scopes, and tenant claims; local Compose explicitly disables authentication for demo use only. The dashboard has no interactive hosted login yet.
 
 Local Kafka stores seven days of topic data across 12 partitions. For a replay of retained events, stop the API consumer, reset its group offset, then start it again. PostgreSQL's event ID uniqueness makes reprocessed events safe from duplicate inserts. The local broker is a single instance with replication factor 1; a shared environment must use a multi-broker cluster with replication factor 3 and minimum in-sync replicas 2 to remove that broker as a single point of failure. The local setup uses plaintext Kafka and is not production-secure.
 
 The sample password in `.env.example` is for a local demonstration only. Use a managed secret for any shared or deployed environment. `docker compose down` stops the services; `docker compose down -v` also removes the local database volume and its data.
 
-The overview only counts vehicles that have sent telemetry; it is not a registered-vehicle inventory. A vehicle is shown as moving or idling only when an engine-on event has arrived within five minutes. Engine-off vehicles and vehicles with stale telemetry are called out separately. Coordinates are displayed as reported by the vehicle; a map/geocoding provider is not connected. The Drivers, Routes & Dispatch, Maintenance, Fuel Management, and Reports items are shown as planned areas, not completed workflows. The fuel figure is an assumption-based idling estimate, not measured savings.
+The overview only counts vehicles that have sent telemetry; it is not a registered-vehicle inventory. A vehicle is shown as moving or idling only when an engine-on event has arrived within five minutes. Engine-off vehicles and vehicles with stale telemetry are called out separately. Coordinates are displayed as reported by the vehicle; a map/geocoding provider is not connected. Drivers, Routes & Dispatch, Maintenance, and Fuel Management have frontend previews with synthetic sample rows; these are not live fleet records. Reports provides hourly telemetry aggregates from ClickHouse, but needs runtime verification against the new Compose stack. The fuel figure is an assumption-based idling estimate, not measured savings.
 
 To generate a full 100,000-vehicle synthetic dataset locally, open **Terminal** in the project folder and run:
 
@@ -99,12 +103,13 @@ This uses Docker to run the Python generator, so you do not need to install Pyth
 
 ```text
 .
-├── docs/                 # Project brief, architecture, and decisions
+├── docs/                 # Project brief, architecture, handoff guide, and decisions
 ├── backend/              # Spring Boot API and PostgreSQL migrations
 ├── frontend/             # React and TypeScript operations dashboard
 ├── src/fleetpulse/       # Python synthetic data generator
 ├── Dockerfile            # Multi-stage Java API container
-├── compose.yaml          # Kafka + API + PostgreSQL + dashboard local stack
+├── infra/clickhouse/     # ClickHouse analytics schema and Kafka ingestion setup
+├── compose.yaml          # Kafka + API + PostgreSQL + ClickHouse + dashboard local stack
 └── data/                 # Generated local data (git-ignored)
 ```
 
@@ -115,6 +120,8 @@ This uses Docker to run the Python generator, so you do not need to install Pyth
 | `API_PORT` | `8080` | Host port for the API |
 | `POSTGRES_PORT` | `5432` | Host port for local database access |
 | `KAFKA_PORT` | `9092` | Local Kafka broker port |
+| `CLICKHOUSE_USER` | `fleetintel` | Local ClickHouse HTTP/client user |
+| `CLICKHOUSE_PASSWORD` | local example value | Local-only ClickHouse password; replace for shared deployments |
 | `POSTGRES_DB` | `fleetintel` | Local database name |
 | `POSTGRES_USER` | `fleetintel` | Local database user |
 | `POSTGRES_PASSWORD` | local example value | Local-only password; replace for shared deployments |
@@ -135,7 +142,7 @@ Fuel-use assumptions are illustrative and must be calibrated with documented fle
 
 ## Next milestones
 
-1. Rebuild and verify the current Docker Compose stack; add alert acknowledgement and wire the dashboard to a selected OIDC provider.
+1. Rebuild the current Compose stack, verify ClickHouse consumes telemetry and Reports displays results, and troubleshoot Docker image build duration if it recurs.
 2. Add multi-broker deployment, dead-letter replay tooling, and a justified high-volume telemetry store.
 3. Add observability and reproducible scale evidence for the hackathon targets.
 

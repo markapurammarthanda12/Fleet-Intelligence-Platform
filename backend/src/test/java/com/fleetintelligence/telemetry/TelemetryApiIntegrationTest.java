@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import com.fleetintelligence.analytics.ClickHouseAnalyticsService;
+import com.fleetintelligence.analytics.HourlyTelemetryPoint;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -62,6 +64,9 @@ class TelemetryApiIntegrationTest {
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
+
+    @MockitoBean
+    private ClickHouseAnalyticsService clickHouseAnalyticsService;
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
@@ -236,6 +241,31 @@ class TelemetryApiIntegrationTest {
                             eventId);
                     org.assertj.core.api.Assertions.assertThat(count).isEqualTo(1);
                 });
+    }
+
+    @Test
+    void hourlyAnalyticsRequiresReadScopeAndMatchingTenant() throws Exception {
+        Instant from = Instant.parse("2026-09-29T00:00:00Z");
+        Instant to = Instant.parse("2026-09-30T00:00:00Z");
+        org.mockito.Mockito.when(clickHouseAnalyticsService.hourlyTelemetry("tenant-demo", from, to))
+                .thenReturn(List.of(new HourlyTelemetryPoint(1790640000000L, 120L, 14L, 28L, 72L)));
+
+        mockMvc.perform(get("/v1/analytics/telemetry/hourly")
+                        .param("tenant_id", "tenant-demo")
+                        .param("from", from.toString())
+                        .param("to", to.toString())
+                        .with(fleetRead("tenant-demo")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].unique_events").value(120))
+                .andExpect(jsonPath("$[0].vehicles_seen").value(14))
+                .andExpect(jsonPath("$[0].idling_events").value(28));
+
+        mockMvc.perform(get("/v1/analytics/telemetry/hourly")
+                        .param("tenant_id", "another-tenant")
+                        .param("from", from.toString())
+                        .param("to", to.toString())
+                        .with(fleetRead("tenant-demo")))
+                .andExpect(status().isForbidden());
     }
 
     @Test

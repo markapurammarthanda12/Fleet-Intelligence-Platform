@@ -55,3 +55,8 @@ fleet:
     topic-min-isr: ${KAFKA_TOPIC_MIN_ISR:1}
     producer-ack-timeout-ms: ${KAFKA_PRODUCER_ACK_TIMEOUT_MS:2000}
     consumer-group: ${KAFKA_CONSUMER_GROUP:fleet-intelligence-processor}
+
+  analytics:
+    clickhouse-url: ${CLICKHOUSE_HTTP_URL:http://localhost:8123}
+    clickhouse-user: ${CLICKHOUSE_USER:fleetintel}
+    clickhouse-password: ${CLICKHOUSE_PASSWORD:fleetintel_local_only}
