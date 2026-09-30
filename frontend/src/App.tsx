@@ -73,6 +73,7 @@ export default function App() {
   }, [alerts, statusFilter, vehicleFilter]);
 
   const openCount = alerts.filter((alert) => alert.status === "open").length;
+  const criticalCount = alerts.filter((alert) => alert.status === "open" && alert.severity === "critical").length;
   const estimatedFuel = alerts
     .filter((alert) => alert.status === "open")
     .reduce((total, alert) => total + alert.estimated_fuel_litres, 0);
@@ -166,9 +167,9 @@ export default function App() {
           <small>Estimate for open idling alerts</small>
         </article>
         <article className="metric-card panel">
-          <div className="metric-top"><span>Alerts recorded</span><span className="metric-icon violet">⌁</span></div>
-          <strong>{alerts.length}</strong>
-          <small>Open and resolved for {tenant}</small>
+          <div className="metric-top"><span>Critical alerts</span><span className="metric-icon violet">!</span></div>
+          <strong>{criticalCount}</strong>
+          <small>Open idling alerts at 15+ minutes</small>
         </article>
       </section>
 
@@ -208,12 +209,12 @@ export default function App() {
               <tbody>
                 {visibleAlerts.map((alert) => (
                   <tr key={alert.alert_id}>
-                    <td><span className="signal-dot" />Prolonged idling<small className="rule">Rule {alert.rule_version}</small></td>
+                    <td><span className={`signal-dot signal-${alert.severity}`} />Prolonged idling<small className="rule">Rule {alert.rule_version}</small></td>
                     <td><span className="vehicle-id">{alert.vehicle_id}</span><small className="tenant-id">{alert.tenant_id}</small></td>
                     <td>{formatDuration(alert.idle_seconds)}</td>
                     <td className="fuel-value">{alert.estimated_fuel_litres.toFixed(2)} L</td>
                     <td>{formatDate(alert.episode_started_at)}</td>
-                    <td><span className={`badge ${alert.status === "open" ? "badge-open" : "badge-resolved"}`}><span />{alert.status}</span></td>
+                    <td><span className={`badge badge-${alert.severity}`}><span />{alert.severity}</span><small className={`alert-status status-${alert.status}`}>{alert.status}</small></td>
                   </tr>
                 ))}
               </tbody>

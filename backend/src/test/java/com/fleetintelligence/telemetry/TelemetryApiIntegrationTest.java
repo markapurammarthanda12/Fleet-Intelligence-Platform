@@ -74,6 +74,7 @@ class TelemetryApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].vehicle_id").value("idle-vehicle"))
                 .andExpect(jsonPath("$[0].status").value("open"))
+                .andExpect(jsonPath("$[0].severity").value("warning"))
                 .andExpect(jsonPath("$[0].idle_seconds").value(360))
                 .andExpect(jsonPath("$[0].estimated_fuel_litres").value(0.15))
                 .andExpect(jsonPath("$[0].resolved_at").value(org.hamcrest.Matchers.nullValue()));
@@ -84,6 +85,20 @@ class TelemetryApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].status").value("resolved"))
                 .andExpect(jsonPath("$[0].resolved_at").isNotEmpty());
+    }
+
+    @Test
+    void prolongedIdlingEscalatesToCriticalAndIsPrioritized() throws Exception {
+        send("warning-start", "warning-vehicle", "2026-09-30T08:00:00Z", 0, 1, 201);
+        send("warning-threshold", "warning-vehicle", "2026-09-30T08:06:00Z", 0, 2, 201);
+        send("critical-start", "critical-vehicle", "2026-09-30T08:00:00Z", 0, 3, 201);
+        send("critical-threshold", "critical-vehicle", "2026-09-30T08:16:00Z", 0, 4, 201);
+
+        mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].vehicle_id").value("critical-vehicle"))
+                .andExpect(jsonPath("$[0].severity").value("critical"))
+                .andExpect(jsonPath("$[1].severity").value("warning"));
     }
 
     @Test

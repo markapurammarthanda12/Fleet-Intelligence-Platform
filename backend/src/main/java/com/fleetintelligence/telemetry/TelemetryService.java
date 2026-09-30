@@ -15,14 +15,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class TelemetryService {
     private final JdbcTemplate jdbcTemplate;
     private final long idleAlertSeconds;
+    private final long criticalIdleSeconds;
     private final double fuelLitresPerIdleHour;
 
     public TelemetryService(
             JdbcTemplate jdbcTemplate,
             @Value("${IDLE_ALERT_SECONDS:300}") long idleAlertSeconds,
+            @Value("${IDLE_CRITICAL_SECONDS:900}") long criticalIdleSeconds,
             @Value("${FUEL_LITRES_PER_IDLE_HOUR:1.5}") double fuelLitresPerIdleHour) {
         this.jdbcTemplate = jdbcTemplate;
         this.idleAlertSeconds = idleAlertSeconds;
+        this.criticalIdleSeconds = criticalIdleSeconds;
         this.fuelLitresPerIdleHour = fuelLitresPerIdleHour;
     }
 
@@ -83,7 +86,9 @@ public class TelemetryService {
                        estimated_fuel_litres, status, resolved_at
                 FROM fleet_alerts
                 WHERE tenant_id = ?
-                ORDER BY last_observed_at DESC
+                ORDER BY CASE WHEN status = 'open' THEN 0 ELSE 1 END,
+                         CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
+                         idle_seconds DESC, last_observed_at DESC
                 LIMIT ?
                 """,
                 alertRowMapper(),
@@ -164,20 +169,23 @@ public class TelemetryService {
 
     private void upsertIdleAlert(TelemetryRequest event, Instant startedAt, long idleSeconds) {
         double estimatedFuel = Math.round(fuelLitresPerIdleHour * idleSeconds / 3600.0 * 1000.0) / 1000.0;
+        String severity = idleSeconds >= criticalIdleSeconds ? "critical" : "warning";
         jdbcTemplate.update("""
                 INSERT INTO fleet_alerts (
                     alert_id, tenant_id, vehicle_id, rule_version, severity,
                     episode_started_at, last_observed_at, idle_seconds,
                     estimated_fuel_litres, status
-                ) VALUES (?, ?, ?, 'idle-v1', 'warning', ?, ?, ?, ?, 'open')
+                ) VALUES (?, ?, ?, 'idle-v1', ?, ?, ?, ?, ?, 'open')
                 ON CONFLICT (tenant_id, vehicle_id, rule_version, episode_started_at)
-                DO UPDATE SET last_observed_at = EXCLUDED.last_observed_at,
+                DO UPDATE SET severity = EXCLUDED.severity,
+                              last_observed_at = EXCLUDED.last_observed_at,
                               idle_seconds = EXCLUDED.idle_seconds,
                               estimated_fuel_litres = EXCLUDED.estimated_fuel_litres
                 """,
                 UUID.randomUUID().toString(),
                 event.tenantId(),
                 event.vehicleId(),
+                severity,
                 Timestamp.from(startedAt),
                 Timestamp.from(event.observedAt()),
                 idleSeconds,

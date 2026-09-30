@@ -9,6 +9,7 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 - The Python simulator produces reproducible synthetic events, including delayed and duplicate deliveries.
 - Docker Compose is configured for the API, PostgreSQL, and an operator dashboard, with a persistent database volume and a database health check.
 - The API exposes readiness through Spring Boot Actuator and supports bounded telemetry history queries.
+- Idling alerts escalate from `warning` to `critical` after 15 minutes by default and are returned with open, critical alerts first. This is a demo policy configurable with `IDLE_CRITICAL_SECONDS`.
 
 ## Hackathon deliverables and current status
 
@@ -103,6 +104,7 @@ To generate synthetic telemetry locally, install the small Python package with `
 | `POSTGRES_USER` | `fleetintel` | Local database user |
 | `POSTGRES_PASSWORD` | local example value | Local-only password; replace for shared deployments |
 | `IDLE_ALERT_SECONDS` | `300` | Stationary engine-on duration before an idling alert opens |
+| `IDLE_CRITICAL_SECONDS` | `900` | Stationary duration before an open idling alert escalates to critical |
 | `FUEL_LITRES_PER_IDLE_HOUR` | `1.5` | Illustrative fuel-burn assumption used in alert estimates |
 
 Fuel-use assumptions are illustrative and must be calibrated with documented fleet-specific data before presenting savings as measured results.
