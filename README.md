@@ -18,7 +18,7 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 | Real-time ingestion and alerting | API validates and persists idempotent events; sustained-idle alerts have been exercised end to end on the local stack | Add Kafka stream processing and latency evidence at challenge scale |
 | Relational and high-volume data | PostgreSQL telemetry, vehicle state, and alert tables are implemented | Add fleet metadata and a high-volume telemetry store after measuring workload |
 | User interface | Local dashboard with tenant and vehicle filters and automatic refresh | Add alert acknowledgement and authenticated API access |
-| Security, tests, and observability | Production authentication, authorization, automated test coverage, and full observability are not implemented | Add tenant-aware access controls, automated checks, metrics/logs/traces, and documented security decisions |
+| Security, tests, and observability | PostgreSQL-backed API integration scenarios and a CI workflow are added; they are not yet run by GitHub Actions | Expand coverage, add tenant-aware access controls, security checks, and metrics/logs/traces |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
 Docker is part of the deliverable. Compose defines the API, PostgreSQL, dashboard, persistent volume, and database health check. The local stack and one synthetic alert journey have been verified; this is not a claim of cloud portability or challenge-scale performance.
