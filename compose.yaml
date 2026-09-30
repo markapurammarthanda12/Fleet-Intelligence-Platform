@@ -1,11 +1,31 @@
 services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fleetintel}
+      POSTGRES_USER: ${POSTGRES_USER:-fleetintel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fleetintel_local_only}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   api:
     build: .
     ports:
-      - "8000:8000"
-    env_file:
-      - path: .env
-        required: false
+      - "${API_PORT:-8080}:8080"
     environment:
-      FUEL_LITRES_PER_IDLE_HOUR: ${FUEL_LITRES_PER_IDLE_HOUR:-1.5}
-      IDLE_ALERT_SECONDS: ${IDLE_ALERT_SECONDS:-300}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-fleetintel}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-fleetintel}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-fleetintel_local_only}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

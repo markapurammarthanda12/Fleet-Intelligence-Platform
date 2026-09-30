@@ -8,3 +8,5 @@ data/*.jsonl
 data/*.csv
 coverage.xml
 htmlcov/
+target/
+.DS_Store

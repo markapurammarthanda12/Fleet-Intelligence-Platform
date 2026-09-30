@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: fleet-intelligence-api
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/fleetintel}
+    username: ${SPRING_DATASOURCE_USERNAME:fleetintel}
+    password: ${SPRING_DATASOURCE_PASSWORD:fleetintel_local_only}
+  flyway:
+    enabled: true
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+server:
+  shutdown: graceful

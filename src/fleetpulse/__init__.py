@@ -1,1 +1,1 @@
-"""FleetPulse connected-vehicle MVP."""
+"""Synthetic telemetry generator for the Fleet Intelligence Platform."""

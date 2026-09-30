@@ -1,17 +1,16 @@
 # Fleet Intelligence Platform — Architecture
 
-## Current starter architecture
+## Current implemented architecture
 
 ```mermaid
 flowchart LR
-  SIM[Synthetic simulator] -->|JSONL / HTTPS| API[FastAPI ingestion API]
-  API --> RULE[Idle duration rule]
-  RULE --> MEM[(In-memory event and alert state)]
-  MEM --> REST[Alerts API]
-  REST --> OP[Operator / API client]
+  SIM[Python synthetic simulator] -->|JSON over HTTPS| API[Spring Boot ingestion API]
+  API -->|validated, idempotent insert| PG[(PostgreSQL telemetry_events)]
+  PG --> QUERY[Bounded tenant and vehicle history query]
+  API --> READY[Actuator readiness endpoint]
 ```
 
-The current API is a single process. Event IDs are de-duplicated in memory; state is lost at restart. It is suitable for local iteration only.
+Docker Compose currently starts the Spring Boot API and PostgreSQL. A Flyway migration creates the telemetry table and query index. PostgreSQL enforces uniqueness on `(tenant_id, event_id)`, so retries after a lost response do not create a second record for that tenant. The API validates coordinates, speed, identifiers, and event time before writing. This is a durable first ingestion slice; stream alerts, authentication, the dashboard, and high-volume benchmarks are not implemented yet.
 
 ## Intended challenge architecture
 
@@ -37,7 +36,7 @@ This target architecture is a design direction, not implemented infrastructure. 
 
 ## Container and deployment deliverable
 
-The current `Dockerfile` packages only the starter API, and the current `compose.yaml` starts only that API. The hackathon deliverable needs a reproducible containerized environment for the actual end-to-end system: ingestion/API, simulator or load generator, event broker, relational and telemetry stores, stream processor, and web dashboard. Compose is the local demonstration profile; deployment manifests and environment-specific configuration must make the same services portable to the selected cloud. Containers must use configurable secrets, health checks, persistent volumes where needed, and documented startup/shutdown steps. The finished stack must be started and exercised together before claiming the Docker deliverable is complete.
+The current `Dockerfile` packages the API using a multi-stage Java build, and `compose.yaml` starts the API and PostgreSQL with a persistent volume and a database health check. This is only the first Docker milestone. The completed hackathon environment still needs the event broker, stream processor, telemetry store, simulator service, dashboard, deployment configuration, and end-to-end evidence. Production secrets must come from the deployment environment, not the local example file. The API is not yet protected by authentication or tenant authorization and is intended for local development only.
 
 ## Data and consistency direction
 
@@ -48,4 +47,4 @@ The current `Dockerfile` packages only the starter API, and the current `compose
 
 ## Capacity baseline from the brief
 
-The case study estimates 100,000 vehicles at one event per second and approximately 1 KB per event: about 100,000 events/second and 8.6 TB/day before compression and down-sampling. FleetPulse has not been benchmarked at this load. The first load-test plan must include a 3x five-minute burst and report throughput, p95/p99 latency, error rate, and consumer lag.
+The case study estimates 100,000 vehicles at one event per second and approximately 1 KB per event: about 100,000 events/second and 8.6 TB/day before compression and down-sampling. The current platform has not been benchmarked at this load. The first load-test plan must include a 3x five-minute burst and report throughput, p95/p99 latency, error rate, and consumer lag.

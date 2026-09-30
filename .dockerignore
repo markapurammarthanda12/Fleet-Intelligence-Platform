@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+!.env.example
+sources/
+data/
+.venv/
+__pycache__/
+*.py[cod]
+target/
+**/target/
+Fleet_Intelligence_Project_Blueprint.docx
