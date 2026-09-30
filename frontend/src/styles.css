@@ -142,6 +142,24 @@ tbody tr:hover { background: #fbfcff; }
 .fleet-section th { padding: 0 13px; font-size: 8px; }
 .fleet-section td { height: 57px; padding: 9px 13px; font-size: 10px; }
 .fleet-section .vehicle-id { font-size: 10px; }
+.vehicle-detail-link { padding: 0; border: 0; background: transparent; color: #315bd0; font-size: 10px; font-weight: 750; text-align: left; cursor: pointer; }
+.vehicle-detail-link:hover { text-decoration: underline; }
+.vehicle-detail-panel { margin: 0 14px 14px; overflow: hidden; border: 1px solid #e8edf5; border-radius: 8px; background: #fbfcff; }
+.vehicle-detail-heading { display: flex; align-items: center; justify-content: space-between; padding: 13px 15px 10px; }
+.vehicle-detail-heading .eyebrow { margin: 0; font-size: 8px; }
+.vehicle-detail-heading h3 { margin-top: 4px; color: #293a55; font-size: 13px; }
+.vehicle-detail-summary { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: 1px; border-top: 1px solid #edf0f5; border-bottom: 1px solid #edf0f5; background: #edf0f5; }
+.vehicle-detail-summary > div { display: grid; align-content: start; gap: 7px; min-width: 0; padding: 11px 13px; background: #fff; }
+.vehicle-detail-summary > div > span { color: #8995a7; font-size: 8px; }
+.vehicle-detail-summary strong { overflow: hidden; color: #43536d; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.vehicle-detail-summary .vehicle-status { display: inline-flex; }
+.vehicle-detail-tabs { display: flex; gap: 3px; padding: 0 12px; border-bottom: 1px solid #e9edf3; background: #fff; }
+.vehicle-detail-tabs button { padding: 10px 8px 8px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #7e8ba0; font-size: 9px; }
+.vehicle-detail-tabs button.selected { border-bottom-color: #4265e8; color: #365ed4; font-weight: 700; }
+.vehicle-detail-note { padding: 13px 15px; color: #8793a5; font-size: 9px; line-height: 1.55; }
+.vehicle-detail-panel .mini-empty { padding: 14px 15px; }
+.vehicle-detail-panel th { padding: 0 13px; }
+.vehicle-detail-panel td { height: 42px; padding: 8px 13px; font-size: 9px; }
 .vehicle-status { display: inline-flex; align-items: center; gap: 6px; color: #53637a; font-size: 9px; text-transform: capitalize; }
 .vehicle-status i, .location-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: #8794a6; }
 .vehicle-moving i, .location-dot.vehicle-moving { background: #27ad7d; }
@@ -288,4 +306,26 @@ tbody tr:hover { background: #fbfcff; }
   .preview-search { width: 100%; }
   .preview-toolbar { align-items: flex-start; flex-direction: column; padding: 0 12px 10px; }
   .preview-toolbar .preview-data-note { padding: 9px 0 2px; }
+  .vehicle-detail-summary { grid-template-columns: repeat(2, minmax(100px, 1fr)); }
+}
+
+/* Fleet operations shell, aligned to the user's dark-navigation reference. */
+.sidebar { border-right-color: #1e3554; background: #10233f; }
+.sidebar .brand { border-bottom-color: #263b58; }
+.sidebar .brand-name { color: #f5f8ff; }
+.sidebar .brand-mark { background: linear-gradient(145deg, #3276ff, #33b8df); color: #fff; }
+.sidebar .nav-item { color: #c0ccdc; }
+.sidebar .nav-item > span:first-child { color: #96a9c1; }
+.sidebar .nav-item small { color: #97a9bf; }
+.sidebar .nav-item.selected { background: #2865ed; color: #fff; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%); }
+.sidebar .nav-item.selected > span:first-child, .sidebar .nav-item.selected small { color: #fff; }
+.sidebar .nav-divider, .sidebar .sidebar-footer { border-color: #263b58; background-color: #263b58; }
+.sidebar .nav-caption, .sidebar .sidebar-footer { color: #93a5bd; }
+.workspace .topbar { position: sticky; z-index: 5; top: 0; border-bottom-color: #e5eaf2; }
+.global-search { display: flex; width: min(360px, 38vw); align-items: center; gap: 9px; padding: 0 11px; border: 1px solid #e3e8f0; border-radius: 7px; color: #8794a7; }
+.global-search input { width: 100%; height: 34px; padding: 0; border: 0; box-shadow: none; font-size: 10px; }
+.global-search input:focus { border: 0; box-shadow: none; }
+@media (max-width: 700px) {
+  .global-search { width: min(48vw, 260px); }
+  .workspace .topbar { position: sticky; }
 }
