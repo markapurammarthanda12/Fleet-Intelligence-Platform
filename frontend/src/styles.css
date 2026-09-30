@@ -169,6 +169,20 @@ tbody tr:hover { background: #fbfcff; }
 .roadmap-note p { font-size: 9px; line-height: 1.6; }
 .roadmap-note strong { color: #4c5d77; }
 .notice { margin: 0 0 14px; }
+.alert-center { margin-top: 14px; overflow: hidden; scroll-margin-top: 16px; }
+.alert-center-heading { align-items: flex-start; gap: 18px; }
+.alert-center-heading > div:first-child > p { max-width: 540px; margin-top: 5px; color: #8a96a8; font-size: 10px; line-height: 1.5; }
+.alert-filters { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.alert-filters input { width: 190px; }
+.alert-filters select { min-width: 125px; }
+.alert-center td { height: 58px; }
+.alert-center .alert-status { display: inline; margin: 0; font-size: 10px; }
+@media (max-width: 700px) {
+  .alert-center-heading { flex-direction: column; }
+  .alert-filters { width: 100%; justify-content: flex-start; }
+  .alert-filters label:first-child { flex: 1 1 100%; }
+  .alert-filters input { width: 100%; }
+}
 
 @media (max-width: 900px) {
   .app-layout { grid-template-columns: 190px minmax(0, 1fr); }

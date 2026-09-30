@@ -121,6 +121,9 @@ export default function App() {
   const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1) || "overview");
   const [vehicleFilter, setVehicleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [alertSearch, setAlertSearch] = useState("");
+  const [alertSeverityFilter, setAlertSeverityFilter] = useState("all");
+  const [alertStatusFilter, setAlertStatusFilter] = useState("all");
   const [overview, setOverview] = useState<FleetOverview>(emptyOverview);
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [alerts, setAlerts] = useState<FleetAlert[]>([]);
@@ -235,6 +238,16 @@ export default function App() {
     });
   }, [statusFilter, vehicleFilter, vehicles]);
 
+  const visibleAlerts = useMemo(() => {
+    const filter = alertSearch.trim().toLowerCase();
+    return alerts.filter((alert) => {
+      const matchesSearch = !filter || alert.vehicle_id.toLowerCase().includes(filter) || alert.alert_id.toLowerCase().includes(filter);
+      const matchesSeverity = alertSeverityFilter === "all" || alert.severity === alertSeverityFilter;
+      const matchesStatus = alertStatusFilter === "all" || alert.status === alertStatusFilter;
+      return matchesSearch && matchesSeverity && matchesStatus;
+    });
+  }, [alertSearch, alertSeverityFilter, alertStatusFilter, alerts]);
+
   return (
     <div className="app-layout">
       <aside className="sidebar" aria-label="Fleet sections">
@@ -329,12 +342,31 @@ export default function App() {
                 {error ? <div className="mini-empty">Vehicle locations are unavailable while the API is offline.</div> : vehicles.slice(0, 4).length === 0 ? <div className="mini-empty">Vehicle locations will appear after telemetry arrives.</div> : <ul className="location-list">{vehicles.slice(0, 4).map((vehicle) => <li key={vehicle.vehicle_id}><span className={`location-dot vehicle-${vehicle.status}`} /><span className="location-copy"><strong>{vehicle.vehicle_id}</strong><small>{formatCoordinate(vehicle.latitude, vehicle.longitude)}</small></span><span className="location-speed">{vehicle.speed_kmh.toFixed(0)} km/h</span></li>)}</ul>}
               </section>
 
-              <section className="recent-alerts panel" id="alerts">
+              <section className="recent-alerts panel">
                 <div className="mini-heading"><div><h2>Recent alerts</h2><p>Explainable operational signals</p></div><span className="count-pill">{alerts.length}</span></div>
                 {error ? <div className="mini-empty">Alerts are unavailable while the API is offline.</div> : alerts.slice(0, 4).length === 0 ? <div className="mini-empty">No alerts for this fleet.</div> : <ul className="alert-list">{alerts.slice(0, 4).map((alert) => <li key={alert.alert_id}><span className={`signal-dot signal-${alert.severity}`} /><div className="alert-copy"><strong>Prolonged idling · {alert.vehicle_id}</strong><small>{alert.severity} · {formatDuration(alert.idle_seconds)} · {formatDate(alert.last_observed_at)}</small></div><span className={`alert-status status-${alert.status}`}>{alert.status}</span></li>)}</ul>}
                 <p className="estimate-note">Idle fuel uses an illustrative 1.5 L/hour assumption; it is not measured savings.</p>
               </section>
             </aside>
+          </section>
+
+          <section className="alert-center panel" id="alerts" aria-labelledby="alert-center-title">
+            <div className="section-heading alert-center-heading">
+              <div><div className="section-title-row"><h2 id="alert-center-title">Alert center</h2><span className="count-pill">{loading || error ? "—" : overview.open_alerts} open</span></div><p>Review idling events with the vehicle, severity, duration, and estimated fuel impact.</p></div>
+              <div className="alert-filters">
+                <label><span className="sr-only">Search alerts by vehicle or alert ID</span><input value={alertSearch} onChange={(event) => setAlertSearch(event.target.value)} placeholder="Search vehicle or alert ID" /></label>
+                <label><span className="sr-only">Filter alerts by severity</span><select value={alertSeverityFilter} onChange={(event) => setAlertSeverityFilter(event.target.value)}><option value="all">All severities</option><option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Info</option></select></label>
+                <label><span className="sr-only">Filter alerts by status</span><select value={alertStatusFilter} onChange={(event) => setAlertStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="open">Open</option><option value="resolved">Resolved</option></select></label>
+              </div>
+            </div>
+            {loading ? <div className="empty-state"><span className="loading-ring" />Loading fleet alerts…</div> : error ? <div className="empty-state"><strong>Alerts are unavailable</strong><span>Check the API connection and refresh the fleet data.</span></div> : visibleAlerts.length === 0 ? (
+              <div className="empty-state"><strong>{alerts.length ? "No alerts match these filters" : "No alerts for this fleet"}</strong><span>{alerts.length ? "Try a different vehicle, severity, or status." : "New operational alerts will appear here when the fleet reports them."}</span></div>
+            ) : (
+              <div className="table-wrap"><table><thead><tr><th>Alert</th><th>Vehicle</th><th>Severity</th><th>Status</th><th>Idle duration</th><th>Estimated fuel</th><th>Last observed</th></tr></thead><tbody>
+                {visibleAlerts.map((alert) => <tr key={alert.alert_id}><td><span className="vehicle-id">Prolonged idling</span><small className="rule">Rule {alert.rule_version}</small></td><td>{alert.vehicle_id}</td><td><span className={`badge badge-${alert.severity}`}><span />{alert.severity}</span></td><td><span className={`alert-status status-${alert.status}`}>{alert.status}</span></td><td>{formatDuration(alert.idle_seconds)}</td><td>{alert.estimated_fuel_litres.toFixed(2)} L</td><td>{formatDate(alert.last_observed_at)}</td></tr>)}
+              </tbody></table></div>
+            )}
+            <footer className="table-footer"><span>Showing {visibleAlerts.length} of {alerts.length} alerts loaded</span><span>Alerts are rule-based explanations; estimated fuel uses the documented demo assumption.</span></footer>
           </section>
 
           <section className="reports-section panel" id="reports">
