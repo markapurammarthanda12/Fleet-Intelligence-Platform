@@ -32,9 +32,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -60,7 +60,7 @@ class TelemetryApiIntegrationTest {
     @Autowired
     private TelemetryService telemetryService;
 
-    @MockBean
+    @MockitoBean
     private JwtDecoder jwtDecoder;
 
     @DynamicPropertySource

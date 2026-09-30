@@ -58,9 +58,15 @@ public class ApiSecurityConfiguration {
     }
 
     @Bean
-    Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter scopes = new JwtGrantedAuthoritiesConverter();
-        return jwt -> {
+    FleetJwtAuthenticationConverter jwtAuthenticationConverter() {
+        return new FleetJwtAuthenticationConverter();
+    }
+
+    static final class FleetJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
+        private final JwtGrantedAuthoritiesConverter scopes = new JwtGrantedAuthoritiesConverter();
+
+        @Override
+        public AbstractAuthenticationToken convert(Jwt jwt) {
             Collection<GrantedAuthority> authorities = new ArrayList<>(scopes.convert(jwt));
             Object rolesClaim = jwt.getClaims().get("roles");
             if (rolesClaim instanceof Collection<?> roles) {
@@ -71,6 +77,6 @@ public class ApiSecurityConfiguration {
                         .forEach(authorities::add);
             }
             return new JwtAuthenticationToken(jwt, authorities);
-        };
+        }
     }
 }

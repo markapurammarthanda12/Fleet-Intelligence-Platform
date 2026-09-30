@@ -50,7 +50,7 @@ Avoid adding a store, broker, cloud, AI layer, or provider just because it appea
 
 ## 5. Implemented behavior at the last known baseline
 
-The last confirmed main-branch commit before the current security milestone is `ccc3c849c733aa55b38cf3b1c36ea837b60a1f02` (`feat: build telemetry-backed fleet overview`). Its GitHub CI run `36695787410` completed successfully.
+The fleet overview base was `ccc3c849c733aa55b38cf3b1c36ea837b60a1f02` (`feat: build telemetry-backed fleet overview`). Its GitHub CI run `36695787410` completed successfully. The latest GitHub `main` is now `3b84e783337cba7b399614114ab207b9f5937178` (`feat: secure fleet APIs and add agent handoff guide`); it includes the first security milestone and this handoff guide, but CI run `36697671067` failed during Spring application startup. A local repair to that failure is not pushed yet (details below).
 
 At that baseline:
 
@@ -64,9 +64,9 @@ At that baseline:
 
 ## 6. Current in-progress security milestone
 
-The current task added local, uncommitted changes intended for the next GitHub commit. Inspect actual files and GitHub branch before continuing; the user workspace is a project mirror, not necessarily a Git checkout.
+The security milestone is partly committed; its latest repair is local and uncommitted. Inspect actual files and remote branch before continuing; the user workspace is a project mirror, not necessarily a Git checkout.
 
-Files changed locally:
+Files included in commit `3b84e783337cba7b399614114ab207b9f5937178`:
 
 - `backend/pom.xml`: add Spring OAuth2 resource server and security test dependencies.
 - New `backend/src/main/java/com/fleetintelligence/security/ApiSecurityConfiguration.java`: hosted mode authenticates requests with OIDC JWT, maps standard OAuth scopes plus optional role claims, leaves health probes public, and has a local demo permit-all chain when explicitly disabled.
@@ -74,8 +74,17 @@ Files changed locally:
 - `compose.yaml` and `.env.example`: local demo defaults to `FLEET_SECURITY_ENABLED=false`; passes optional `OIDC_ISSUER_URI` into API container.
 - `TelemetryApiIntegrationTest`: enable security for integration suite; mock decoder and add mock bearer JWTs. Added checks for missing auth, missing read scope, cross-tenant read and cross-tenant ingestion.
 - `README.md`, `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`: explain hosted JWT/scope/tenant behavior and local demo limitations.
+- `docs/AGENT_HANDOFF.md`: this continuation guide, linked from README.
 
-This security implementation is **not yet verified or pushed** at handoff time. A Docker-based Maven `verify` process is active under exec session ID `61314`; poll that same process before retrying anything. Maven image has been pulled. The frontend production build completed successfully after changes. The plain host `mvn` command is unavailable, and direct Docker access initially failed inside the regular sandbox; a `require_escalated` container launch succeeded. Existing Compose services were running when checked.
+The first GitHub CI run for commit `3b84e78` is at `https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36697671067`. The simulator job passed. Backend compilation and test compilation passed, but all backend integration tests errored because Spring Kafka attempted to register a JWT converter lambda as a generic message converter and could not infer its input/output generic types. The failure was `IllegalArgumentException: Unable to determine source type <S> and target type <T> for your Converter [ApiSecurityConfiguration$$Lambda...]` in `KafkaListenerAnnotationBeanPostProcessor.addFormatters` during context startup.
+
+**Local repair made but not yet pushed:** replace the converter lambda with the concrete nested `FleetJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken>` class, and replace deprecated Boot `@MockBean` with Spring Framework `@MockitoBean`. The agent must commit/push this repair, then follow the next CI run through completion. The concrete class should retain resolvable generic metadata when Spring Kafka inspects converter beans. Confirm this with CI rather than assuming it works.
+
+Verification so far: frontend `npm run build` completed successfully. Host Maven is unavailable. A Maven container was launched, but it did not have the Docker socket required by Testcontainers; it was stopped after confirming the CI failure. **Do not count that local attempt as a passing backend test.** GitHub Actions is the authoritative backend verification until a correctly socket-enabled local setup is used.
+
+Docker state at the last observation: Docker Desktop engine reported running. The existing Compose stack was up with `postgres-1` healthy on host port 5432, `kafka-1` healthy on 9092, `api-1` on 8080, and `dashboard-1` on 3000. These containers were started before the OIDC code was added. The API/dashboard images therefore do not contain the current security change until Compose is rebuilt; the local dashboard continues to use the unauthenticated demo setting. A temporary container named `priceless_roentgen` was only the Maven test runner and has been stopped; the four application containers were left untouched.
+
+The user received a GitHub “run failed” email and asked for it to be checked. Mailbox access is not connected in this task. Plugin discovery found Outlook Email as available but not installed/connected (Gmail is unavailable by admin policy); a connection suggestion was presented. Do not claim the email itself was inspected until the user connects Outlook Email. The authoritative matching GitHub run and logs have already been inspected directly, so the failure cause above is known from GitHub Actions. If Outlook is connected in a resumed tool, search for the failure email for run 11 / commit `3b84e78` and compare the notification to the run logs.
 
 Important review points before claiming completion:
 
@@ -88,7 +97,7 @@ Important review points before claiming completion:
 
 ## 7. Remaining project work (ordered, update as completed)
 
-1. Finish, verify, and push the OAuth2/JWT + tenant isolation change. Capture the GitHub Actions run ID and final result here.
+1. Push the concrete JWT-converter repair plus the updated handoff state, wait for backend Testcontainers and frontend CI jobs, fix any further failures, and update this document with the commit/run/conclusion. Only then rebuild the four local Compose services if needed and check readiness/UI.
 2. Decide and implement a secure browser sign-in / local usability approach; provider, client ID, redirect URL and token claim mapping may require the user's chosen OIDC provider. Do not invent credentials.
 3. Produce a structured status/requirements matrix against the full PDF, including evidence and gaps. Fill in the provided solution document template with honest architecture, test and performance results; render/review the result.
 4. Improve the simulator: trips, diagnostic/fault events, controlled out-of-order and duplicate rates, configurable bursts, and reproducible event-volume presets. Generate/seed 100K data in the demo path without checking giant generated output into Git.
@@ -103,11 +112,13 @@ Important review points before claiming completion:
 ## 8. Repository and workflow instructions
 
 - GitHub repository: `https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform`, default branch `main`.
-- Last baseline commit: `ccc3c849c733aa55b38cf3b1c36ea837b60a1f02`. It had a successful CI run at `https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36695787410`.
+- Latest pushed commit observed: `3b84e783337cba7b399614114ab207b9f5937178`. Its CI run `36697671067` failed in backend integration; simulator job passed. Earlier fleet-overview commit `ccc3c849c733aa55b38cf3b1c36ea837b60a1f02` had a successful CI run at `https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36695787410`.
+- The `main` branch was at commit `3b84e78` the last time it was checked; check again before pushing because a different tool may have updated it.
 - The current ChatGPT project mirror's `AGENTS.md` says all files under `sources/` are read-only reference material. Never edit, rename, move, or delete anything in `sources/`. No files were present there at the last check.
 - The workspace snapshot may not have `.git`; a `git status` failure does not mean the remote repo is missing. Use the connected GitHub integration or work in a normal authenticated clone/worktree. Check the remote `main` head immediately before making a push; do not overwrite a newer commit.
 - Keep generated datasets, secrets, `.env`, and Docker volume data out of Git. Never commit access tokens/passwords. `.env.example` contains demo values only.
 - Start local stack with Docker Desktop: `docker compose up --build`; browser `http://localhost:3000`; stop with `docker compose down`. Do not run `docker compose down -v` unless the user knowingly wants the local database/event history removed.
+- At the last check, Docker Desktop was already running the four-project Compose stack (ports 3000, 8080, 9092, 5432) using images built before the current OAuth changes. Rebuild/restart after fixing CI to test the changed API. The last temporary Maven runner is stopped; don't confuse it with a project service.
 - CI runs simulator tests and Maven/Testcontainers backend `verify`, then frontend `npm ci` and `npm run build`. A green CI run is evidence for those jobs only; it is not load/security/cloud proof.
 - When a user asks “what do I do?”, give app/window-specific directions. If they only use Codex, avoid telling them to open a terminal unless necessary.
 
