@@ -117,6 +117,20 @@ function toDateTimeInput(value: Date) {
   return new Date(value.getTime() - value.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
+function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number>>) {
+  const csv = [headers, ...rows].map((row) => row.map((cell) => {
+    const value = String(cell);
+    const safeValue = /^[=+@\t\r]/.test(value) || (/^-/.test(value) && !/^-?\d+(\.\d+)?$/.test(value)) ? `'${value}` : value;
+    return `"${safeValue.replaceAll('"', '""')}"`;
+  }).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function App() {
   const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1) || "overview");
   const [vehicleFilter, setVehicleFilter] = useState("");
@@ -324,7 +338,7 @@ export default function App() {
             <article className="fleet-section panel" id="vehicles">
               <div className="section-heading">
                 <div><div className="section-title-row"><h2>Vehicle fleet</h2><span className="count-pill">{visibleVehicles.length}</span></div><p>Latest vehicle signals received for this fleet workspace</p></div>
-                <span className="last-updated">Latest event: {formatDate(overview.latest_event_at)}</span>
+                <div className="section-actions"><span className="last-updated">Latest event: {formatDate(overview.latest_event_at)}</span><button className="export-button" type="button" disabled={loading || Boolean(error) || visibleVehicles.length === 0} onClick={() => downloadCsv("fleet-vehicles.csv", ["Vehicle ID", "Status", "Latitude", "Longitude", "Speed km/h", "Last seen", "Open alerts"], visibleVehicles.map((vehicle) => [vehicle.vehicle_id, vehicle.status, vehicle.latitude, vehicle.longitude, vehicle.speed_kmh, vehicle.last_seen_at, vehicle.open_alert_count]))}>Export CSV</button></div>
               </div>
               {loading ? <div className="empty-state"><span className="loading-ring" />Loading connected vehicles…</div> : error ? <div className="empty-state"><strong>Fleet data is unavailable</strong><span>Check the API connection and refresh to try again.</span></div> : visibleVehicles.length === 0 ? (
                 <div className="empty-state"><div className="empty-icon">⌁</div><strong>{vehicles.length ? "No vehicles match these filters" : "No vehicle events received"}</strong><span>{vehicles.length ? "Change your search or status filter." : "Vehicles appear here as telemetry events reach the platform."}</span></div>
@@ -357,6 +371,7 @@ export default function App() {
                 <label><span className="sr-only">Search alerts by vehicle or alert ID</span><input value={alertSearch} onChange={(event) => setAlertSearch(event.target.value)} placeholder="Search vehicle or alert ID" /></label>
                 <label><span className="sr-only">Filter alerts by severity</span><select value={alertSeverityFilter} onChange={(event) => setAlertSeverityFilter(event.target.value)}><option value="all">All severities</option><option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Info</option></select></label>
                 <label><span className="sr-only">Filter alerts by status</span><select value={alertStatusFilter} onChange={(event) => setAlertStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="open">Open</option><option value="resolved">Resolved</option></select></label>
+                <button className="export-button" type="button" disabled={loading || Boolean(error) || visibleAlerts.length === 0} onClick={() => downloadCsv("fleet-alerts.csv", ["Alert ID", "Vehicle ID", "Rule", "Severity", "Status", "Episode started", "Last observed", "Idle seconds", "Estimated fuel litres"], visibleAlerts.map((alert) => [alert.alert_id, alert.vehicle_id, alert.rule_version, alert.severity, alert.status, alert.episode_started_at, alert.last_observed_at, alert.idle_seconds, alert.estimated_fuel_litres]))}>Export CSV</button>
               </div>
             </div>
             {loading ? <div className="empty-state"><span className="loading-ring" />Loading fleet alerts…</div> : error ? <div className="empty-state"><strong>Alerts are unavailable</strong><span>Check the API connection and refresh the fleet data.</span></div> : visibleAlerts.length === 0 ? (
@@ -372,9 +387,12 @@ export default function App() {
           <section className="reports-section panel" id="reports">
             <div className="section-heading reports-heading">
               <div><div className="section-title-row"><h2>Historical fleet activity</h2><span className="count-pill">Hourly</span></div><p>Batch summaries from retained telemetry, grouped by UTC hour and fleet.</p></div>
-              <div className="report-range">
+              <div className="report-actions">
+                <div className="report-range">
                 <label>From <input type="datetime-local" value={analyticsFrom} onChange={(event) => setAnalyticsFrom(event.target.value)} /></label>
                 <label>To <input type="datetime-local" value={analyticsTo} onChange={(event) => setAnalyticsTo(event.target.value)} /></label>
+                </div>
+                <button className="export-button" type="button" disabled={analyticsLoading || Boolean(analyticsError) || analytics.length === 0} onClick={() => downloadCsv("fleet-hourly-activity.csv", ["Hour UTC", "Unique events", "Vehicles", "Idling samples", "Moving samples"], analytics.map((row) => [new Date(row.bucket_start_epoch_ms).toISOString(), row.unique_events, row.vehicles_seen, row.idling_events, row.moving_events]))}>Export CSV</button>
               </div>
             </div>
             {analyticsError && <div className="notice error" role="alert">{analyticsError}</div>}
