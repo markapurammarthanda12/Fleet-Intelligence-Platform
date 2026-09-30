@@ -671,7 +671,7 @@ export default function App() {
               <div className="empty-state"><strong>No historical activity in this range</strong><span>Telemetry events appear here after the stream reaches the analytical store.</span></div>
             ) : (
               <div className="table-wrap"><table><thead><tr><th>Hour (UTC)</th><th>Unique events</th><th>Vehicles</th><th>Idling samples</th><th>Moving samples</th></tr></thead><tbody>
-                {analytics.map((row) => <tr key={row.bucket_start_epoch_ms}><td>{new Date(row.bucket_start_epoch_ms).toLocaleString(undefined, { timeZone: "UTC", dateStyle: "medium", hour: "2-digit" })} UTC</td><td>{row.unique_events.toLocaleString()}</td><td>{row.vehicles_seen.toLocaleString()}</td><td>{row.idling_events.toLocaleString()}</td><td>{row.moving_events.toLocaleString()}</td></tr>)}
+                {analytics.map((row) => <tr key={row.bucket_start_epoch_ms}><td>{new Date(row.bucket_start_epoch_ms).toLocaleString(undefined, { timeZone: "UTC", year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} UTC</td><td>{row.unique_events.toLocaleString()}</td><td>{row.vehicles_seen.toLocaleString()}</td><td>{row.idling_events.toLocaleString()}</td><td>{row.moving_events.toLocaleString()}</td></tr>)}
               </tbody></table></div>
             )}
             <footer className="table-footer"><span>Workspace: <strong>Demo fleet</strong></span><span>Duplicate Kafka deliveries are counted once per event ID in each hour. Analytics retain 90 days.</span></footer>
