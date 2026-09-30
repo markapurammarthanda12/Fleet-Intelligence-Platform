@@ -87,6 +87,16 @@ type FleetVehicle = {
   open_alert_count: number;
 };
 
+type VehicleTelemetry = {
+  eventId: string;
+  observedAt: string;
+  latitude: number;
+  longitude: number;
+  speedKmh: number;
+  engineOn: boolean;
+  sequence: number | null;
+};
+
 const emptyOverview: FleetOverview = {
   vehicles_seen: 0,
   moving_now: 0,
@@ -134,6 +144,7 @@ function downloadCsv(filename: string, headers: string[], rows: Array<Array<stri
 export default function App() {
   const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1) || "overview");
   const [vehicleFilter, setVehicleFilter] = useState("");
+  const [globalSearch, setGlobalSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [alertSearch, setAlertSearch] = useState("");
   const [alertSeverityFilter, setAlertSeverityFilter] = useState("all");
@@ -147,6 +158,11 @@ export default function App() {
   const [analytics, setAnalytics] = useState<HourlyTelemetryPoint[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState("");
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [vehicleHistory, setVehicleHistory] = useState<VehicleTelemetry[]>([]);
+  const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false);
+  const [vehicleHistoryError, setVehicleHistoryError] = useState("");
+  const [vehicleDetailTab, setVehicleDetailTab] = useState<"overview" | "history" | "alerts">("overview");
   const [analyticsTo, setAnalyticsTo] = useState(() => toDateTimeInput(new Date()));
   const [analyticsFrom, setAnalyticsFrom] = useState(() => toDateTimeInput(new Date(Date.now() - 24 * 60 * 60 * 1000)));
 
@@ -236,6 +252,27 @@ export default function App() {
     return () => { active = false; };
   }, [analyticsFrom, analyticsTo]);
 
+  useEffect(() => {
+    if (!selectedVehicleId) {
+      setVehicleHistory([]);
+      setVehicleHistoryError("");
+      return;
+    }
+    let active = true;
+    setVehicleHistoryLoading(true);
+    setVehicleHistoryError("");
+    const query = new URLSearchParams({ tenant_id: DEMO_TENANT_ID, vehicle_id: selectedVehicleId, limit: "50" });
+    fetch(`/api/v1/telemetry?${query.toString()}`, { headers: { Accept: "application/json" } })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Vehicle history could not be loaded (HTTP ${response.status}).`);
+        return response.json() as Promise<VehicleTelemetry[]>;
+      })
+      .then((events) => { if (active) setVehicleHistory(events); })
+      .catch((cause: unknown) => { if (active) setVehicleHistoryError(cause instanceof Error ? cause.message : "Could not load vehicle history."); })
+      .finally(() => { if (active) setVehicleHistoryLoading(false); });
+    return () => { active = false; };
+  }, [selectedVehicleId]);
+
   const analyticsTotals = useMemo(() => analytics.reduce((totals, row) => ({
     events: totals.events + row.unique_events,
     vehicles: Math.max(totals.vehicles, row.vehicles_seen),
@@ -261,6 +298,8 @@ export default function App() {
       return matchesSearch && matchesSeverity && matchesStatus;
     });
   }, [alertSearch, alertSeverityFilter, alertStatusFilter, alerts]);
+  const selectedVehicle = vehicles.find((vehicle) => vehicle.vehicle_id === selectedVehicleId) ?? null;
+  const selectedVehicleAlerts = alerts.filter((alert) => alert.vehicle_id === selectedVehicleId);
 
   return (
     <div className="app-layout">
@@ -287,6 +326,7 @@ export default function App() {
       <main className="workspace" id="overview">
         <header className="topbar">
           <div className="breadcrumb">Fleet overview <span>/</span> Operations</div>
+          <label className="global-search"><span aria-hidden="true">⌕</span><span className="sr-only">Search vehicles and alerts</span><input value={globalSearch} onChange={(event) => { setGlobalSearch(event.target.value); setVehicleFilter(event.target.value); setAlertSearch(event.target.value); }} placeholder="Search vehicles, alerts…" /></label>
           <div className="topbar-right">
             <span className="workspace-label">Demo fleet · local</span>
             <span className="avatar" aria-label="Fleet operator">FO</span>
@@ -344,9 +384,24 @@ export default function App() {
                 <div className="empty-state"><div className="empty-icon">⌁</div><strong>{vehicles.length ? "No vehicles match these filters" : "No vehicle events received"}</strong><span>{vehicles.length ? "Change your search or status filter." : "Vehicles appear here as telemetry events reach the platform."}</span></div>
               ) : (
                 <div className="table-wrap"><table><thead><tr><th>Vehicle ID</th><th>Status</th><th>Latest location</th><th>Speed</th><th>Last seen</th><th>Open alerts</th></tr></thead><tbody>
-                  {visibleVehicles.map((vehicle) => <tr key={vehicle.vehicle_id}><td><span className="vehicle-id">{vehicle.vehicle_id}</span></td><td><span className={`vehicle-status vehicle-${vehicle.status}`}><i />{vehicle.status === "inactive" ? "Engine off" : vehicle.status}</span></td><td className="coordinate">{formatCoordinate(vehicle.latitude, vehicle.longitude)}</td><td>{vehicle.speed_kmh.toFixed(1)} km/h</td><td>{formatDate(vehicle.last_seen_at)}</td><td>{vehicle.open_alert_count}</td></tr>)}
+                  {visibleVehicles.map((vehicle) => <tr key={vehicle.vehicle_id}><td><button className="vehicle-detail-link" type="button" onClick={() => { setSelectedVehicleId(vehicle.vehicle_id); setVehicleDetailTab("overview"); }}>{vehicle.vehicle_id}</button></td><td><span className={`vehicle-status vehicle-${vehicle.status}`}><i />{vehicle.status === "inactive" ? "Engine off" : vehicle.status}</span></td><td className="coordinate">{formatCoordinate(vehicle.latitude, vehicle.longitude)}</td><td>{vehicle.speed_kmh.toFixed(1)} km/h</td><td>{formatDate(vehicle.last_seen_at)}</td><td>{vehicle.open_alert_count}</td></tr>)}
                 </tbody></table></div>
               )}
+              {selectedVehicle && <section className="vehicle-detail-panel" aria-label={`Details for ${selectedVehicle.vehicle_id}`}>
+                <div className="vehicle-detail-heading"><div><span className="eyebrow">VEHICLE DETAILS</span><h3>{selectedVehicle.vehicle_id}</h3></div><button className="preview-close" type="button" onClick={() => setSelectedVehicleId(null)}>Close</button></div>
+                <div className="vehicle-detail-summary">
+                  <div><span>Current status</span><strong className={`vehicle-status vehicle-${selectedVehicle.status}`}><i />{selectedVehicle.status === "inactive" ? "Engine off" : selectedVehicle.status}</strong></div>
+                  <div><span>Last reported speed</span><strong>{selectedVehicle.speed_kmh.toFixed(1)} km/h</strong></div>
+                  <div><span>Latest coordinates</span><strong>{formatCoordinate(selectedVehicle.latitude, selectedVehicle.longitude)}</strong></div>
+                  <div><span>Last seen</span><strong>{formatDate(selectedVehicle.last_seen_at)}</strong></div>
+                </div>
+                <div className="vehicle-detail-tabs" role="tablist" aria-label="Vehicle detail sections">
+                  {(["overview", "history", "alerts"] as const).map((tab) => <button key={tab} id={`vehicle-tab-${tab}`} role="tab" aria-selected={vehicleDetailTab === tab} type="button" className={vehicleDetailTab === tab ? "selected" : ""} onClick={() => setVehicleDetailTab(tab)}>{tab === "overview" ? "Overview" : tab === "history" ? "Telemetry history" : `Alerts (${selectedVehicleAlerts.length})`}</button>)}
+                </div>
+                {vehicleDetailTab === "overview" && <p className="vehicle-detail-note">This view uses the latest vehicle telemetry received by the platform. Location is shown as reported coordinates; no map provider is connected.</p>}
+                {vehicleDetailTab === "history" && (vehicleHistoryLoading ? <div className="mini-empty">Loading recent telemetry…</div> : vehicleHistoryError ? <div className="mini-empty" role="alert">{vehicleHistoryError}</div> : vehicleHistory.length === 0 ? <div className="mini-empty">No telemetry history is available for this vehicle.</div> : <div className="table-wrap"><table><thead><tr><th>Observed</th><th>Engine</th><th>Speed</th><th>Coordinates</th><th>Event</th></tr></thead><tbody>{vehicleHistory.map((event) => <tr key={event.eventId}><td>{formatDate(event.observedAt)}</td><td>{event.engineOn ? "On" : "Off"}</td><td>{event.speedKmh.toFixed(1)} km/h</td><td>{formatCoordinate(event.latitude, event.longitude)}</td><td><span className="vehicle-id">{event.eventId}</span></td></tr>)}</tbody></table></div>)}
+                {vehicleDetailTab === "alerts" && (selectedVehicleAlerts.length === 0 ? <div className="mini-empty">No alerts are associated with this vehicle.</div> : <div className="table-wrap"><table><thead><tr><th>Alert</th><th>Severity</th><th>Status</th><th>Duration</th><th>Estimated fuel</th></tr></thead><tbody>{selectedVehicleAlerts.map((alert) => <tr key={alert.alert_id}><td>Prolonged idling · {alert.vehicle_id}</td><td><span className={`badge badge-${alert.severity}`}><span />{alert.severity}</span></td><td>{alert.status}</td><td>{formatDuration(alert.idle_seconds)}</td><td>{alert.estimated_fuel_litres.toFixed(2)} L</td></tr>)}</tbody></table></div>)}
+              </section>}
               <footer className="table-footer"><span>Showing up to 200 recently reporting vehicles</span><span>Coordinates are the latest vehicle-reported positions; no map/geocoding provider is connected.</span></footer>
             </article>
 
