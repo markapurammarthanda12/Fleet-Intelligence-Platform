@@ -600,7 +600,12 @@ tbody tr:hover { background: #fbfcff; }
   .overview-metrics .metric-card small { font-size: 9px; }
   .overview-charts { grid-template-columns: 1fr; }
   .chart-card-heading h2 { font-size: 12px; }
-  .content .eyebrow { font-size: 9px; }
+.content .eyebrow { font-size: 9px; }
   .content .subtitle { font-size: 11px; }
   .nav-item { gap: 8px; font-size: 10px; }
+  .alert-center .table-wrap th:nth-child(6), .alert-center .table-wrap td:nth-child(6),
+  .alert-center .table-wrap th:nth-child(7), .alert-center .table-wrap td:nth-child(7) { display: none; }
+  .compact-table-note { display: block !important; }
 }
+
+.compact-table-note { display: none; }
