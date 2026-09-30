@@ -343,8 +343,8 @@ export default function App() {
             <div className="report-summary" aria-label="Historical telemetry totals">
               <div><span>Unique events</span><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.events.toLocaleString()}</strong></div>
               <div><span>Peak vehicles per hour</span><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.vehicles.toLocaleString()}</strong></div>
-              <div><span>Idling samples</span><strong>{analyticsLoading ? "—" : analyticsTotals.idling.toLocaleString()}</strong></div>
-              <div><span>Moving samples</span><strong>{analyticsLoading ? "—" : analyticsTotals.moving.toLocaleString()}</strong></div>
+              <div><span>Idling samples</span><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.idling.toLocaleString()}</strong></div>
+              <div><span>Moving samples</span><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.moving.toLocaleString()}</strong></div>
             </div>
             {analyticsLoading ? <div className="empty-state"><span className="loading-ring" />Loading historical activity…</div> : analyticsError ? (
               <div className="empty-state"><strong>Historical activity is unavailable</strong><span>Check the analytics service and try again.</span></div>
