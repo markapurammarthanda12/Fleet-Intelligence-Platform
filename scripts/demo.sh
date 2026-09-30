@@ -30,6 +30,17 @@ post_stationary_event "$FIRST_EVENT_ID" "$FIRST_OBSERVED_AT" 1
 post_stationary_event "$SECOND_EVENT_ID" "$SECOND_OBSERVED_AT" 2
 
 printf '\nAlerts for %s:\n' "$TENANT_ID"
-curl --fail --silent --show-error \
-  "${API_BASE_URL}/v1/alerts?tenant_id=${TENANT_ID}"
+for attempt in {1..40}; do
+  if ALERTS="$(curl --fail --silent --show-error "${API_BASE_URL}/v1/alerts?tenant_id=${TENANT_ID}")"; then
+    if [[ "$ALERTS" == *"$VEHICLE_ID"* ]]; then
+      printf '%s' "$ALERTS"
+      break
+    fi
+  fi
+  if [[ "$attempt" == 40 ]]; then
+    printf 'The telemetry was accepted, but the alert was not visible after 10 seconds. Check the API and Kafka consumer logs.\n' >&2
+    exit 1
+  fi
+  sleep 0.25
+done
 printf '\n\nIn the dashboard, set Fleet / tenant to %s.\n' "$TENANT_ID"

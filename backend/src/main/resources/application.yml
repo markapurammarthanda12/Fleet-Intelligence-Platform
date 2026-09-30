@@ -5,6 +5,29 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/fleetintel}
     username: ${SPRING_DATASOURCE_USERNAME:fleetintel}
     password: ${SPRING_DATASOURCE_PASSWORD:fleetintel_local_only}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        compression.type: lz4
+        linger.ms: 5
+        batch.size: 65536
+        max.in.flight.requests.per.connection: 5
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:fleet-intelligence-processor}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        max.poll.records: ${KAFKA_MAX_POLL_RECORDS:500}
+    listener:
+      ack-mode: record
+      concurrency: ${KAFKA_CONSUMER_CONCURRENCY:4}
   flyway:
     enabled: true
   jackson:
@@ -22,3 +45,13 @@ management:
 
 server:
   shutdown: graceful
+
+fleet:
+  telemetry:
+    topic: ${FLEET_TELEMETRY_TOPIC:fleet.telemetry.v1}
+  kafka:
+    topic-partitions: ${KAFKA_TOPIC_PARTITIONS:12}
+    topic-replication-factor: ${KAFKA_TOPIC_REPLICATION_FACTOR:1}
+    topic-min-isr: ${KAFKA_TOPIC_MIN_ISR:1}
+    producer-ack-timeout-ms: ${KAFKA_PRODUCER_ACK_TIMEOUT_MS:2000}
+    consumer-group: ${KAFKA_CONSUMER_GROUP:fleet-intelligence-processor}

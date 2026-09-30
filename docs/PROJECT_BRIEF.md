@@ -13,9 +13,9 @@ This is a hypothesis, not yet validated by customer interviews or operational da
 ## MVP user journey
 
 1. A synthetic connected-vehicle event for a tenant and vehicle reaches the ingestion API.
-2. The service validates its timestamp, coordinates, speed, and event identity.
-3. A rule identifies sustained stationary engine-on activity.
-4. The platform evaluates the incoming event against explainable fleet rules and persists any resulting alert.
+2. The service validates its timestamp, coordinates, speed, and event identity, then returns `202 Accepted` after Kafka confirms durable receipt.
+3. A keyed Kafka consumer persists the event and updates event-time state; idling alerts are evaluated with bounded retries for processing failures.
+4. The platform persists any explainable fleet alert and routes events that exhaust retries to a retained dead-letter topic for operator investigation.
 5. The operations dashboard lets an operator compare vehicles and investigate current or resolved alerts; subsequent workflows can use the same event foundation for maintenance, utilisation, safety, and cost decisions.
 
 ## Initial success measures
@@ -34,7 +34,7 @@ Targets are project goals; they are not measured results yet.
 
 - Synthetic location coordinates are generated around Bengaluru and do not represent real vehicles.
 - Fuel burn during idling varies by vehicle and conditions. The default 1.5 litres/hour is an illustrative assumption.
-- A single event cannot establish an idle duration. The current API uses per-vehicle event-time state to open and resolve prolonged-idling alerts; synthetic events have exercised this journey locally. Late events are persisted but do not rewind the current vehicle state.
+- A single event cannot establish an idle duration. The Kafka consumer uses per-vehicle event-time state to open and resolve prolonged-idling alerts; late events are persisted but do not rewind the current vehicle state. The local Kafka-backed journey awaits CI and local-stack verification.
 - Driver-level attribution is out of scope until privacy, consent, and access requirements are defined.
 
 ## Boundary

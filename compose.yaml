@@ -1,4 +1,32 @@
 services:
+  kafka:
+    image: apache/kafka:3.9.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_NUM_PARTITIONS: 12
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   postgres:
     image: postgres:18-alpine
     environment:
@@ -24,9 +52,21 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-fleetintel}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-fleetintel_local_only}
       IDLE_ALERT_SECONDS: ${IDLE_ALERT_SECONDS:-300}
+      IDLE_CRITICAL_SECONDS: ${IDLE_CRITICAL_SECONDS:-900}
       FUEL_LITRES_PER_IDLE_HOUR: ${FUEL_LITRES_PER_IDLE_HOUR:-1.5}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-fleet-intelligence-processor}
+      KAFKA_TOPIC_PARTITIONS: ${KAFKA_TOPIC_PARTITIONS:-12}
+      KAFKA_TOPIC_REPLICATION_FACTOR: ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+      KAFKA_TOPIC_MIN_ISR: ${KAFKA_TOPIC_MIN_ISR:-1}
+      KAFKA_CONSUMER_CONCURRENCY: ${KAFKA_CONSUMER_CONCURRENCY:-4}
+      KAFKA_MAX_POLL_RECORDS: ${KAFKA_MAX_POLL_RECORDS:-500}
+      KAFKA_RETRY_ATTEMPTS: ${KAFKA_RETRY_ATTEMPTS:-5}
+      KAFKA_PRODUCER_ACK_TIMEOUT_MS: ${KAFKA_PRODUCER_ACK_TIMEOUT_MS:-2000}
     depends_on:
       postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
 
   dashboard:
@@ -38,3 +78,4 @@ services:
 
 volumes:
   postgres-data:
+  kafka-data:

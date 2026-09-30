@@ -2,7 +2,6 @@ package com.fleetintelligence.telemetry;
 
 import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,16 +14,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/telemetry")
 public class TelemetryController {
     private final TelemetryService telemetryService;
+    private final TelemetryPublisher telemetryPublisher;
 
-    public TelemetryController(TelemetryService telemetryService) {
+    public TelemetryController(TelemetryService telemetryService, TelemetryPublisher telemetryPublisher) {
         this.telemetryService = telemetryService;
+        this.telemetryPublisher = telemetryPublisher;
     }
 
     @PostMapping
     public ResponseEntity<IngestResponse> ingest(@Valid @RequestBody TelemetryRequest event) {
-        boolean duplicate = telemetryService.ingest(event);
-        HttpStatus status = duplicate ? HttpStatus.OK : HttpStatus.CREATED;
-        return ResponseEntity.status(status).body(new IngestResponse(true, duplicate));
+        telemetryPublisher.publish(event);
+        return ResponseEntity.accepted().body(new IngestResponse(true, event.eventId(), "queued"));
     }
 
     @GetMapping

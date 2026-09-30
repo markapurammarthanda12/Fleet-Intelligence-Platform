@@ -5,6 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +18,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -28,17 +32,24 @@ class TelemetryApiIntegrationTest {
             .withUsername("fleetintel")
             .withPassword("test-only-password");
 
+    @Container
+    private static final KafkaContainer KAFKA = new KafkaContainer("apache/kafka:3.9.1");
+
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private TelemetryService telemetryService;
+
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
     }
 
     @BeforeEach
@@ -49,15 +60,19 @@ class TelemetryApiIntegrationTest {
     }
 
     @Test
-    void duplicateDeliveryIsAcknowledgedWithoutDuplicatingTheEvent() throws Exception {
-        String event = event("retry-event", "retry-vehicle", "2026-09-30T08:00:00Z", 0, 1);
-
-        mockMvc.perform(post("/v1/telemetry").contentType("application/json").content(event))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.duplicate").value(false));
-        mockMvc.perform(post("/v1/telemetry").contentType("application/json").content(event))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.duplicate").value(true));
+    void duplicateBrokerDeliveryIsIdempotentInTheDatabase() throws Exception {
+        send("retry-event", "retry-vehicle", "2026-09-30T08:00:00Z", 0, 1);
+        boolean duplicate = telemetryService.ingest(new TelemetryRequest(
+                "retry-event",
+                "tenant-demo",
+                "retry-vehicle",
+                Instant.parse("2026-09-30T08:00:00Z"),
+                new BigDecimal("12.9716"),
+                new BigDecimal("77.5946"),
+                BigDecimal.ZERO,
+                true,
+                1L));
+        org.assertj.core.api.Assertions.assertThat(duplicate).isTrue();
 
         Integer storedEvents = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM telemetry_events WHERE tenant_id = 'tenant-demo' AND event_id = 'retry-event'",
@@ -67,8 +82,8 @@ class TelemetryApiIntegrationTest {
 
     @Test
     void stationaryEventsOpenExplainableAlertAndMovementResolvesIt() throws Exception {
-        send("idle-start", "idle-vehicle", "2026-09-30T08:00:00Z", 0, 1, 201);
-        send("idle-after-threshold", "idle-vehicle", "2026-09-30T08:06:00Z", 0, 2, 201);
+        send("idle-start", "idle-vehicle", "2026-09-30T08:00:00Z", 0, 1);
+        send("idle-after-threshold", "idle-vehicle", "2026-09-30T08:06:00Z", 0, 2);
 
         mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo"))
                 .andExpect(status().isOk())
@@ -79,7 +94,7 @@ class TelemetryApiIntegrationTest {
                 .andExpect(jsonPath("$[0].estimated_fuel_litres").value(0.15))
                 .andExpect(jsonPath("$[0].resolved_at").value(org.hamcrest.Matchers.nullValue()));
 
-        send("vehicle-moved", "idle-vehicle", "2026-09-30T08:07:00Z", 25, 3, 201);
+        send("vehicle-moved", "idle-vehicle", "2026-09-30T08:07:00Z", 25, 3);
 
         mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo"))
                 .andExpect(status().isOk())
@@ -89,10 +104,10 @@ class TelemetryApiIntegrationTest {
 
     @Test
     void prolongedIdlingEscalatesToCriticalAndIsPrioritized() throws Exception {
-        send("warning-start", "warning-vehicle", "2026-09-30T08:00:00Z", 0, 1, 201);
-        send("warning-threshold", "warning-vehicle", "2026-09-30T08:06:00Z", 0, 2, 201);
-        send("critical-start", "critical-vehicle", "2026-09-30T08:00:00Z", 0, 3, 201);
-        send("critical-threshold", "critical-vehicle", "2026-09-30T08:16:00Z", 0, 4, 201);
+        send("warning-start", "warning-vehicle", "2026-09-30T08:00:00Z", 0, 1);
+        send("warning-threshold", "warning-vehicle", "2026-09-30T08:06:00Z", 0, 2);
+        send("critical-start", "critical-vehicle", "2026-09-30T08:00:00Z", 0, 3);
+        send("critical-threshold", "critical-vehicle", "2026-09-30T08:16:00Z", 0, 4);
 
         mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo"))
                 .andExpect(status().isOk())
@@ -103,9 +118,9 @@ class TelemetryApiIntegrationTest {
 
     @Test
     void lateEventIsStoredButDoesNotRewindOpenAlertState() throws Exception {
-        send("late-start", "late-vehicle", "2026-09-30T08:00:00Z", 0, 1, 201);
-        send("late-threshold", "late-vehicle", "2026-09-30T08:06:00Z", 0, 2, 201);
-        send("late-arrival", "late-vehicle", "2026-09-30T08:02:00Z", 20, 3, 201);
+        send("late-start", "late-vehicle", "2026-09-30T08:00:00Z", 0, 1);
+        send("late-threshold", "late-vehicle", "2026-09-30T08:06:00Z", 0, 2);
+        send("late-arrival", "late-vehicle", "2026-09-30T08:02:00Z", 20, 3);
 
         mockMvc.perform(get("/v1/alerts").param("tenant_id", "tenant-demo"))
                 .andExpect(status().isOk())
@@ -131,12 +146,25 @@ class TelemetryApiIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(storedEvents).isZero();
     }
 
-    private void send(String eventId, String vehicleId, String observedAt, int speed, int sequence, int status)
+    private void send(String eventId, String vehicleId, String observedAt, int speed, int sequence)
             throws Exception {
         mockMvc.perform(post("/v1/telemetry")
                         .contentType("application/json")
                         .content(event(eventId, vehicleId, observedAt, speed, sequence)))
-                .andExpect(status().is(status));
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.accepted").value(true))
+                .andExpect(jsonPath("$.event_id").value(eventId))
+                .andExpect(jsonPath("$.status").value("queued"));
+
+        org.awaitility.Awaitility.await()
+                .atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> {
+                    Integer count = jdbcTemplate.queryForObject(
+                            "SELECT count(*) FROM telemetry_events WHERE tenant_id = 'tenant-demo' AND event_id = ?",
+                            Integer.class,
+                            eventId);
+                    org.assertj.core.api.Assertions.assertThat(count).isEqualTo(1);
+                });
     }
 
     private String event(String eventId, String vehicleId, String observedAt, int speed, int sequence) {
