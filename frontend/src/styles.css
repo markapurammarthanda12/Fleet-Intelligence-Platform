@@ -492,6 +492,11 @@ tbody tr:hover { background: #fbfcff; }
 .content[data-active-section="reports"] .reports-section,
 .content[data-active-section="decisions"] .decisions-screen,
 .content[data-active-section="settings"] .settings-screen { display: block; }
+.content[data-active-section="overview"] .filters,
+.content[data-active-section="vehicles"] .filters { display: flex; }
+.content[data-active-section="overview"] .overview-metrics { display: grid; }
+.content[data-active-section="overview"] .overview-charts { display: grid; }
+.content[data-active-section="overview"] .overview-grid { display: grid; }
 .content[data-active-section="vehicles"] .overview-grid { display: block; }
 .content[data-active-section="vehicles"] .side-panels { display: none; }
 .content[data-active-section="overview"] .overview-grid { grid-template-columns: minmax(0, 1.6fr) minmax(255px, .9fr); }
