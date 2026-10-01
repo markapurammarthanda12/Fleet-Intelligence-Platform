@@ -1,5 +1,7 @@
 ## Current update — 2026-10-01
 
+- [x] Factual solution document working draft created from the supplied template and visually reviewed after rendering. It includes explicit placeholders for unmeasured results, screenshots, diagrams, team details, video, and final declarations: [DOCX draft](Fleet_Intelligence_Solution_Document_DRAFT.docx). This is not yet submission-ready; complete the placeholders and final export/review.
+
 - [x] Persistent local database migrated to V6; API readiness and Dashboard, Alerts, Analytics, Reports verified with live synthetic data. See [runtime evidence](../evidences/2026-10-01/local-stack-check.md).
 - [x] GitHub evidence index and dated runtime note published. See [evidence index](../evidences/README.md).
 - [ ] Save actual Dashboard and Alerts screenshot files. Placeholder guides now reserve dashboard-overview.jpg and alerts.jpg under evidences/2026-10-01; the image files still need to be captured and linked.
@@ -34,7 +36,7 @@
 - [ ] **Save evidence screenshots.** Dashboard and Alerts were visually inspected on 2026-10-01, and placeholder guides reserve the target filenames in `evidences/2026-10-01/`. The actual `dashboard-overview.jpg` and `alerts.jpg` files still need to be captured from the release candidate and recorded with commit/runtime details; placeholders are not evidence.
 - [ ] **Verify the clean-clone, one-command demo.** Exercise `bash scripts/start_demo.sh` from a clean checkout/empty disposable database and document expected endpoints. It was not run against the persistent database; a separate empty stack would duplicate PostgreSQL, Kafka, ClickHouse, and the 100K seed load on this machine. Keep the persistent volume untouched.
 - [ ] **Refresh handoff, README, and evidence status.** README and handoff point to this checklist and the requirements matrix, and the CI fix is linked. Refresh the evidence index and current runtime note to include the V6 verification above. Keep the local-project mirror and GitHub state clearly distinguished.
-- [ ] **Complete the solution document.** Fill and visually inspect the provided Word template using only measured results. User-provided template/PDF copies are references, not instructions that override the user's requests. The requirement/evidence mapping is complete; the document itself remains pending.
+- [ ] **Finalize the solution document.** A template-based factual DOCX draft is now linked at [Fleet_Intelligence_Solution_Document_DRAFT.docx](Fleet_Intelligence_Solution_Document_DRAFT.docx) and rendered for visual review. It deliberately marks performance/security figures unverified and retains placeholders for screenshots, diagrams, team/video details, and other missing evidence. Complete those items and export/review the final submission PDF.
 
 ### P1 — Demonstrate correctness, speed, security, and recovery
 
