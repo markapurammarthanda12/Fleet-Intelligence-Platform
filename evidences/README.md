@@ -10,6 +10,7 @@ The current ordered work and evidence status is tracked in [the project checklis
 - `2026-10-01/build-and-simulator-tests.md` records repeatable source-level validation.
 - `2026-10-01/current-stack-recheck.md` records the latest read-only runtime and build checks.
 - `2026-10-01/screenshot-capture.md` records the local app, capture time, viewport, counts, and interpretation limits for the images below.
+- `2026-10-02/runtime-and-query-plan-check.md` records the latest Docker/API/database check and the V7 Alerts query-plan comparison.
 - [`2026-10-01/dashboard-overview.jpg`](2026-10-01/dashboard-overview.jpg) shows the Overview page.
 - [`2026-10-01/alerts.jpg`](2026-10-01/alerts.jpg) shows the Alerts page.
 
@@ -21,7 +22,7 @@ The screenshots are embedded in Section 3.1 of [`docs/Fleet_Intelligence_Solutio
 - Critical-alert and ingest-to-dashboard end-to-end latency results.
 - Broker/service failure-recovery results and a multi-node availability demonstration.
 - Coverage, contract/acceptance, security scan, and chaos test reports.
-- Query-plan evidence (`EXPLAIN ANALYZE` before and after optimization).
+- Comparable before/after `EXPLAIN ANALYZE` plans for the overview and vehicle/history/report queries. One warm-cache alert-list plan comparison and a ClickHouse partition-pruning plan are available in `2026-10-02/runtime-and-query-plan-check.md`.
 - Final system/observability screenshots captured against the release candidate, including observability metrics not shown in these product screenshots.
 
 The screenshots do not prove cloud deployment, real vehicle connectivity, performance targets, availability, or production security.

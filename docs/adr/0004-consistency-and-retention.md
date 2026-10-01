@@ -1,0 +1,11 @@
+# ADR 0004 Choose consistency boundaries and retention for telemetry
+
+- Status: Accepted for the local prototype; production retention and availability need owner review.
+- Context: The system stores tenant ownership and actionable alert state, accepts a high-volume replayable event stream, and builds an independent analytical copy. Those workloads cannot share one transaction across PostgreSQL, Kafka, and ClickHouse. The hackathon also asks for CAP/PACELC reasoning and a hot/warm/cold retention plan.
+- Options considered:
+  1. Write directly to one relational database and synchronously query it for all analytics.
+  2. Acknowledge only after both operational and analytical stores commit, coupling ingress to both stores.
+  3. Acknowledge a durable Kafka write, update operational state transactionally and deduplicated in PostgreSQL, and let an independent ClickHouse consumer build eventually consistent analytical views.
+- Decision: Use option 3. Kafka keys by `(tenant_id, vehicle_id)` and retains seven days locally; PostgreSQL enforces tenant ownership and event identity and commits alert/current-state changes atomically; ClickHouse builds a separate analytical history with monthly partitions and a 90-day raw-data TTL. Treat ownership and alert writes as consistency-first (CP-oriented); tolerate short analytical lag for reports and recover the analytical copy from retained Kafka records where possible. The local Compose broker remains single-node/RF=1 for demonstration only. Cold object-storage retention is deferred.
+- Consequences: Ingestion returns `202 Accepted` after Kafka acknowledgement, before PostgreSQL and ClickHouse necessarily catch up. A cross-store exactly-once transaction is not claimed; database uniqueness and rollup event-ID distinct counts make repeated delivery idempotent in the implemented paths. Kafka outage makes ingestion unavailable in the current topology, and retention/erasure does not currently remove corresponding backups or all derived records. Production must define legal retention and erasure, deploy replicated brokers and stores, and measure recovery and consumer lag.
+- Evidence: `docs/ARCHITECTURE.md`, `docs/ALGORITHMS_AND_CAPACITY.md`, `docs/adr/0002-stream-and-storage.md`, `docs/adr/0003-analytical-store.md`, and `evidences/2026-10-02/runtime-and-query-plan-check.md`.

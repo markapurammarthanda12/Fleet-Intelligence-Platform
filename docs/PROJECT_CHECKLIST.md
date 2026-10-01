@@ -17,7 +17,10 @@
 - [x] **Verify the migrated local stack and core screens.** V1–V6 are applied on the persistent local database; API readiness, dashboard, Alerts, Analytics, and Reports were checked against the running 100,000-vehicle synthetic fleet. Values and limits are recorded in [`local-stack-check.md`](../evidences/2026-10-01/local-stack-check.md).
 - [x] **Publish the dated runtime evidence and evidence index.** [`evidences/README.md`](../evidences/README.md) and [`2026-10-01/local-stack-check.md`](../evidences/2026-10-01/local-stack-check.md) are committed. Dashboard and Alerts screenshots have now been saved with capture metadata; see [`screenshot-capture.md`](../evidences/2026-10-01/screenshot-capture.md).
 - [x] **Recheck the current local stack and source builds.** Compose configuration and frontend production build passed; the simulator suite passed all 3 tests; API readiness returned UP, the dashboard returned HTTP 200, and the fleet overview returned 100,000 vehicles. The read-only results and limitations are in [`current-stack-recheck.md`](../evidences/2026-10-01/current-stack-recheck.md).
-- [x] **Architecture and decision notes.** Current architecture and three ADRs exist. These still need the C4 and evidence refinements listed below.
+- [x] **Architecture diagrams and decision notes.** Eight diagrams, including C4 context/container, event flow, post-V6 ownership ER, deployment, service layers, and two sequences, are embedded in the solution draft and listed in [`DIAGRAMS.md`](DIAGRAMS.md). Four ADRs cover product scope, Kafka, ClickHouse analytics, and consistency/retention.
+- [x] **Improve and measure the live Alerts query.** Flyway V7 adds a tenant-scoped expression index matching the Alerts API priority ordering. On the persistent local database, the exact same 100-row query used a sequential scan plus top-N sort in 12.910 ms before-equivalent and an index scan in 0.100 ms after V7 (one warm-cache `EXPLAIN ANALYZE` sample). API readiness remained UP and the existing volumes were preserved. See [`runtime-and-query-plan-check.md`](../evidences/2026-10-02/runtime-and-query-plan-check.md).
+- [x] **Document STRIDE risks and current controls.** [`SECURITY_THREAT_MODEL.md`](SECURITY_THREAT_MODEL.md) identifies assets, trust boundaries, six STRIDE categories, implemented controls, and gaps; this is a design review, not proof those controls are deployed or penetration-tested.
+- [x] **Document event algorithms and capacity arithmetic.** [`ALGORITHMS_AND_CAPACITY.md`](ALGORITHMS_AND_CAPACITY.md) records pseudocode, complexity, CAP/retention choices, and official-brief volume estimates, explicitly separating arithmetic/design from measured capacity.
 
 ## Remaining work, in priority order
 
@@ -25,23 +28,23 @@
 
 - [x] **Capture product screenshots.** The working local synthetic Dashboard and Alerts pages were captured on 2026-10-01, saved under [`evidences/2026-10-01/`](../evidences/README.md), and inserted in Section 3.1 of the solution draft. These are functional product screenshots, not performance or observability evidence. Capture final-release screenshots again after final UI changes.
 - [ ] **Verify the clean-clone, one-command demo.** Exercise `bash scripts/start_demo.sh` from a clean checkout/empty disposable database and document expected endpoints. It was not run against the persistent database; a separate empty stack would duplicate the database, broker, analytics service, and 100K seed load on this machine. Keep the persistent volume untouched.
-- [ ] **Refresh handoff and README from the latest runtime.** State that V6 is applied and core routes were checked; link to the new evidence note/index. Distinguish this local Docker run from GitHub CI and the local project mirror.
+- [x] **Refresh handoff and README from the latest runtime.** The handoff and README distinguish the 2026-10-01 persistent local Compose checks from GitHub CI, screenshots, and the unverified clean-clone/load/availability requirements.
 - [ ] **Complete the solution document.** The working draft contains the product screenshots and architecture diagrams, with unresolved user-editable fields highlighted yellow. Finish the remaining team, validation, benchmark, security, testing, demo, declarations, and final-release evidence fields; visually inspect the final Word/PDF export. User-provided template/PDF copies are reference material; the user's requests determine the project choices.
 
 ### P1 — Demonstrate correctness, speed, security, and recovery
 
-- [ ] **Measure query plans.** Save representative `EXPLAIN (ANALYZE, BUFFERS)` results for key fleet and analytics queries and explain index/partition choices.
+- [ ] **Complete query-plan evidence.** One before/after alert-list plan is recorded; current overview (82.143 ms), 200-vehicle page (0.461 ms), and ClickHouse partition-pruning plans are also recorded. Capture a genuine before/after improvement for the other key queries; do not report the forced old plan as a historical pre-change run.
 - [ ] **Raise and report test coverage.** Add meaningful unit, contract, acceptance, and security checks; measure core coverage and target at least 80% where the challenge requires it. Keep coverage reports as evidence.
 - [ ] **Run realistic performance and soak tests.** Measure throughput, event loss, consumer lag, ingest-to-dashboard latency, critical-alert latency, and API p95/p99. Include 100,000 events/second and a 3× five-minute burst if the available test environment can support it. Do not claim a target passed until measured.
 - [ ] **Test failure and recovery behavior.** Demonstrate broker/database interruption, retry and dead-letter inspection/replay, backlog recovery, and no event loss under the selected test conditions.
-- [ ] **Complete security/privacy design.** Add threat model/STRIDE, audit controls, rate limits, retention/deletion/masking decisions, and verify hosted OIDC browser login when an issuer/client is configured. Local demo mode is not production security.
+- [ ] **Implement and verify security/privacy controls.** The STRIDE review and retention/masking decisions are documented. Still implement/verify audit logging, rate limits, TLS/mTLS, location masking, deletion/retention workflows, security scans, and hosted browser OIDC when an issuer/client is configured. Local demo mode is not production security.
 
 ### P2 — Deployment and final submission
 
-- [ ] **Create a C4 architecture set** (context, container, and relevant component view) consistent with the code and deployment model.
+- [x] **Create the architecture diagram set.** The current repository includes C4 context/container plus event flow, tenant/vehicle ER, deployment, layers, and failure/alert sequences. Keep it aligned with implementation as the system changes.
 - [ ] **Prove deployment and availability.** Add infrastructure/deployment configuration for a selected cloud or a credible cloud-agnostic target, remove single points of failure for the demonstrated topology, and measure recovery/availability. Credentials or provider setup may require the user.
 - [ ] **Complete simulator scenarios.** Add reproducible bursts, duplicates, out-of-order events, faults/trips, and documented volume presets without committing large generated datasets.
-- [ ] **Finalize 3–5 ADRs** with alternatives and trade-offs; ensure relational, stream, and analytical storage choices are justified against the requirements.
+- [x] **Finalize 3–5 ADRs** with alternatives and trade-offs; four records cover product scope, messaging, analytical storage, and the CAP/retention choice.
 - [ ] **Prepare demo and release package.** Record the requested short demo, attach measured evidence, resolve checklist gaps, and create the submission tag only after the release candidate is verified.
 
 ## External/manual dependencies
