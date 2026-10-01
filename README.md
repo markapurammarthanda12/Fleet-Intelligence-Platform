@@ -164,9 +164,14 @@ Fuel-use assumptions are illustrative and must be calibrated with documented fle
 
 ## Next milestones
 
-1. Diagnose the repeated Dockerized Maven package stall, then rebuild the Compose stack without deleting volumes. Verify all five services, ClickHouse telemetry consumption, Reports, and the dashboard at port 3000.
-2. Add multi-broker deployment, dead-letter replay tooling, and a justified high-volume telemetry store.
-3. Add observability and reproducible scale evidence for the hackathon targets.
+1. Deploy the latest API image and confirm Flyway V4 backfills current vehicle state. Recheck `/actuator/health/readiness` and `/v1/fleet/overview`; the previous image's overview timed out under the current Docker load.
+2. Investigate Kafka's slow health probes and ClickHouse/PostgreSQL resource use. The optional live simulator is temporarily paused; resume it only after core API routes are responsive, using a measured sustainable event rate.
+3. Verify Reports/ClickHouse end to end, then complete alert acknowledgement and hosted interactive login.
+4. Add multi-broker deployment, dead-letter replay, observability, and reproducible throughput/latency/loss evidence for the hackathon targets.
+
+The latest backend optimization is commit `51192e36d674e890fedc360ac263bccc612b0285`; its GitHub Actions run passed. It stores each vehicle's latest reported coordinates and status in the runtime-state table, allowing fleet overview and vehicle-list queries to avoid rescanning telemetry history. The migration must be applied by restarting the API from the updated image. Local Maven is not required because the backend build runs in Docker/CI, but Maven is not available in the current shell.
+
+At the last local runtime check on 2026-10-01, the dashboard returned HTTP 200 and the fuel-summary API returned saved records. Docker reported Kafka health probes timing out, CPU near 735% of eight cores, and 2.83 GB of 3.73 GB memory in use. The API readiness endpoint returned HTTP 200 after the live simulator was paused, while the old fleet-overview query still timed out. Docker volumes and generated database data were preserved. Do not report the local stack as fully healthy until these checks pass after the API update.
 
 See [the project brief](docs/PROJECT_BRIEF.md) and [architecture notes](docs/ARCHITECTURE.md).
 
