@@ -4,7 +4,7 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 
 ## Runtime status — 2026-10-01
 
-The Docker dashboard (`http://localhost:3000/`), API readiness, fuel summary, and 100,000-vehicle overview return HTTP 200. Reports uses exact hourly aggregate states with raw events only for partial boundary hours. The 37-hour request returned in 0.21 seconds during a 5 events/second simulator run (previously 21.3 seconds). All six containers were up. One resource sample showed ClickHouse at about 1.12 GiB and 109% CPU; this is a single observation, not a sustained-load benchmark. Alert acknowledgement is available in the refreshed dashboard. No database volumes were removed. GitHub Actions for the latest alert change is [running](https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36834384180).
+The Docker dashboard (`http://localhost:3000/`), API readiness, fuel summary, and 100,000-vehicle overview return HTTP 200. Reports uses exact hourly aggregate states with raw events only for partial boundary hours. The 37-hour request returned in 0.40 seconds during a 5 events/second simulator run (previously 21.3 seconds). All six containers were up. One earlier resource sample showed ClickHouse at about 1.12 GiB and 109% CPU; a later sample was about 1.29 GiB and 12% CPU. These are observations, not a sustained-load benchmark. Alert acknowledgement is available in the refreshed dashboard. No database volumes were removed. Alert feature CI [passed](https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36834384180); handoff refresh CI [passed](https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36834739194).
 
 ## Current implementation
 
