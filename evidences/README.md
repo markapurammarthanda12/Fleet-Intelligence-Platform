@@ -8,6 +8,7 @@ The current ordered work and evidence status is tracked in [the project checklis
 
 - `2026-10-01/local-stack-check.md` records the live Docker/API/dashboard checks and their limits.
 - `2026-10-01/build-and-simulator-tests.md` records repeatable source-level validation.
+- `2026-10-01/current-stack-recheck.md` records the latest read-only runtime and build checks.
 
 Dashboard and Alerts were visually inspected in the running local app on 2026-10-01. The browser displayed both captures, but this environment could not save them as image files in the repository. The following placeholder guides reserve the filenames and explain what to capture; replace them with actual images before submission:
 
