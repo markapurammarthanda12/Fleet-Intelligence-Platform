@@ -21,17 +21,40 @@ import org.springframework.web.server.ResponseStatusException;
 public class ClickHouseAnalyticsService {
     private static final Duration MAX_RANGE = Duration.ofDays(31);
     private static final String HOURLY_QUERY = """
-            SELECT
-                toUnixTimestamp(toStartOfHour(observed_at)) * 1000 AS bucket_start_epoch_ms,
-                uniqExact(event_id) AS unique_events,
-                uniqExact(vehicle_id) AS vehicles_seen,
-                uniqExactIf(event_id, engine_on AND speed_kmh <= 0.5) AS idling_events,
-                uniqExactIf(event_id, engine_on AND speed_kmh > 0.5) AS moving_events
-            FROM fleet_analytics.telemetry_events
-            WHERE tenant_id = {tenant_id:String}
-              AND observed_at >= parseDateTime64BestEffort({start:String}, 3, 'UTC')
-              AND observed_at < parseDateTime64BestEffort({end:String}, 3, 'UTC')
-            GROUP BY bucket_start_epoch_ms
+            WITH
+                parseDateTime64BestEffort({start:String}, 3, 'UTC') AS start_at,
+                parseDateTime64BestEffort({end:String}, 3, 'UTC') AS end_at,
+                if(start_at = toStartOfHour(start_at), toStartOfHour(start_at), toStartOfHour(start_at) + INTERVAL 1 HOUR) AS first_full_hour
+            SELECT bucket_start_epoch_ms, unique_events, vehicles_seen, idling_events, moving_events
+            FROM
+            (
+                SELECT
+                    toUnixTimestamp(bucket_start) * 1000 AS bucket_start_epoch_ms,
+                    uniqExactMerge(unique_events_state) AS unique_events,
+                    uniqExactMerge(vehicles_seen_state) AS vehicles_seen,
+                    uniqExactIfMerge(idling_events_state) AS idling_events,
+                    uniqExactIfMerge(moving_events_state) AS moving_events
+                FROM fleet_analytics.telemetry_hourly_rollup
+                WHERE tenant_id = {tenant_id:String}
+                  AND bucket_start >= first_full_hour
+                  AND bucket_start < toStartOfHour(end_at)
+                GROUP BY tenant_id, bucket_start
+
+                UNION ALL
+
+                SELECT
+                    toUnixTimestamp(toStartOfHour(observed_at)) * 1000 AS bucket_start_epoch_ms,
+                    uniqExact(event_id) AS unique_events,
+                    uniqExact(vehicle_id) AS vehicles_seen,
+                    uniqExactIf(event_id, engine_on AND speed_kmh <= 0.5) AS idling_events,
+                    uniqExactIf(event_id, engine_on AND speed_kmh > 0.5) AS moving_events
+                FROM fleet_analytics.telemetry_events
+                WHERE tenant_id = {tenant_id:String}
+                  AND observed_at >= start_at
+                  AND observed_at < end_at
+                  AND (observed_at < first_full_hour OR observed_at >= toStartOfHour(end_at))
+                GROUP BY bucket_start_epoch_ms
+            )
             ORDER BY bucket_start_epoch_ms
             FORMAT JSONEachRow
             """;
@@ -54,14 +77,14 @@ public class ClickHouseAnalyticsService {
 
         try {
             URI queryUri = UriComponentsBuilder.fromPath("/")
-                    .queryParam("query", UriUtils.encodeQueryParam(HOURLY_QUERY, StandardCharsets.UTF_8))
                     .queryParam("param_tenant_id", UriUtils.encodeQueryParam(tenantId, StandardCharsets.UTF_8))
                     .queryParam("param_start", UriUtils.encodeQueryParam(from.toString(), StandardCharsets.UTF_8))
                     .queryParam("param_end", UriUtils.encodeQueryParam(to.toString(), StandardCharsets.UTF_8))
                     .build(true)
                     .toUri();
-            String response = clickHouse.get()
+            String response = clickHouse.post()
                     .uri(queryUri)
+                    .body(HOURLY_QUERY)
                     .retrieve()
                     .body(String.class);
             return parseRows(response == null ? "" : response);

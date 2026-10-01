@@ -4,7 +4,7 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 
 ## Runtime status — 2026-10-01
 
-The local Docker dashboard (`http://localhost:3000/`), API readiness, fuel summary, and 100,000-vehicle overview return HTTP 200. The fleet overview was 0.13 seconds under idle conditions but rose to 6.8 seconds during a high-load sample. A real ClickHouse Reports query returned hourly aggregates in 21.3 seconds; container CPU remained high afterward. The optional live simulator is currently stopped to avoid adding load, and no database volumes were removed. Treat Reports performance and current resource use as open work. The latest frontend and backend changes are on `main`; the frontend CI run [36829676934 passed](https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36829676934).
+The local Docker dashboard (`http://localhost:3000/`), API readiness, fuel summary, and 100,000-vehicle overview return HTTP 200. Reports now uses exact hourly aggregate states with raw events only for partial boundary hours. The same 37-hour query returned in 0.16 seconds (previously 21.3 seconds); a custom partial-hour query returned in 0.17 seconds. At the last check, API, dashboard, PostgreSQL, Kafka, and ClickHouse were up and CPU/memory were within available capacity. The optional live simulator remains paused until the optimized stack is checked under load. No database volumes were removed. The GitHub changes are being published and CI will run for them; the prior frontend CI run [36829676934 passed](https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36829676934).
 
 ## Current implementation
 
@@ -168,14 +168,12 @@ Fuel-use assumptions are illustrative and must be calibrated with documented fle
 
 ## Next milestones
 
-1. Optimize Reports/ClickHouse hourly aggregation and recheck CPU and overview latency.
-2. Restart the simulator at 5 events/second only after the stack stays responsive; confirm live movement updates.
+1. Check Reports latency and CPU under a controlled 5 events/second simulator run; retain exact-count results.
+2. Confirm live movement and map updates remain responsive during the stream; pause it again if the host starts to saturate.
 3. Implement alert acknowledgement and hosted interactive OIDC login; keep Drivers, Routes, and Maintenance labeled as previews until implemented.
 4. Add reproducible coverage/throughput/latency/loss evidence, multi-broker deployment, dead-letter replay, observability, and cloud/IaC and solution-document/video deliverables.
 
 The latest backend optimization is commit `51192e36d674e890fedc360ac263bccc612b0285`; its GitHub Actions run passed. It stores each vehicle's latest reported coordinates and status in the runtime-state table, allowing fleet overview and vehicle-list queries to avoid rescanning telemetry history. The V4 migration is applied by the currently running API image. Local Maven is not required because the backend build runs in Docker/CI, but Maven is not available in the current shell.
-
-At the last local runtime check on 2026-10-01, the dashboard returned HTTP 200 and the fuel-summary API returned saved records. Docker reported Kafka health probes timing out, CPU near 735% of eight cores, and 2.83 GB of 3.73 GB memory in use. The API readiness endpoint returned HTTP 200 after the live simulator was paused, while the old fleet-overview query still timed out. Docker volumes and generated database data were preserved. Do not report the local stack as fully healthy until these checks pass after the API update.
 
 See [the project brief](docs/PROJECT_BRIEF.md) and [architecture notes](docs/ARCHITECTURE.md).
 

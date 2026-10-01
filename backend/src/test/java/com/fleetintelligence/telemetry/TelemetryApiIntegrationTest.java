@@ -41,7 +41,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-@TestPropertySource(properties = "fleet.security.enabled=true")
+@TestPropertySource(properties = {"fleet.security.enabled=true", "fleet.analytics.rollups.enabled=false"})
 class TelemetryApiIntegrationTest {
     private static final String TELEMETRY_TOPIC = "fleet.telemetry.v1";
     @Container
