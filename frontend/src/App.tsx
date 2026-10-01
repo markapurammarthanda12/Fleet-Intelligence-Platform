@@ -126,6 +126,27 @@ function displayVehicleId(value: string) {
   return value.length > 20 ? `${value.slice(0, 12)}…${value.slice(-6)}` : value;
 }
 
+type NavIconName = "dashboard" | "fleet" | "alerts" | "analytics" | "vehicles" | "fuel" | "decisions" | "reports" | "settings";
+
+function ProductMark() {
+  return <svg className="product-mark" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="fleet-mark-gradient" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse"><stop stopColor="#57a5ff" /><stop offset="1" stopColor="#1685f8" /></linearGradient></defs><path fill="url(#fleet-mark-gradient)" d="M4 19V5.3c0-.8.6-1.3 1.4-1.3h12.1a2.2 2.2 0 0 1 0 4.4H9.1v2.1h5.6a2.2 2.2 0 1 1 0 4.4H9.1V19a2.55 2.55 0 0 1-5.1 0Z" /></svg>;
+}
+
+function NavigationIcon({ name }: { name: NavIconName }) {
+  const props = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (name) {
+    case "dashboard": return <svg className="nav-icon" viewBox="0 0 20 20" aria-hidden="true" {...props}><path d="M3 9.2 10 3l7 6.2V17H3z"/><path d="M7.5 17v-5h5v5"/></svg>;
+    case "fleet": return <svg className="nav-icon" viewBox="0 0 20 20" aria-hidden="true" {...props}><path d="M10 17s5.5-4.6 5.5-9A5.5 5.5 0 0 0 4.5 8c0 4.4 5.5 9 5.5 9Z"/><circle cx="10" cy="8" r="1.8"/></svg>;
+    case "alerts": return <svg className="nav-icon" viewBox="0 0 20 20" aria-hidden="true" {...props}><path d="M15.7 8a5.7 5.7 0 0 0-11.4 0c0 6-2 6-2 7.4h15.4c0-1.4-2-1.4-2-7.4Z"/><path d="M8 18h4"/></svg>;
+    case "analytics": return <svg className="nav-icon" viewBox="0 0 20 20" aria-hidden="true" {...props}><path d="M3 16.5h14"/><path d="M5 14V9m5 5V4m5 10V7"/></svg>;
+    case "vehicles": return <svg className="nav-icon" viewBox="0 0 20 20" aria-hidden="true" {...props}><path d="m4 11 1.3-4A2 2 0 0 1 7.2 5.5h5.6A2 2 0 0 1 14.7 7l1.3 4v4H4z"/><path d="M4 11h12M6 15.5v1m8-1v1"/><circle cx="6.5" cy="12.8" r=".8"/><circle cx="13.5" cy="12.8" r=".8"/></svg>;
+    case "fuel": return <svg className="nav-icon" viewBox="0 0 20 20" aria-hidden="true" {...props}><path d="M5 17V4.8A1.8 1.8 0 0 1 6.8 3h4.4A1.8 1.8 0 0 1 13 4.8V17M4 17h10M6.5 6h4"/><path d="M13 7h1.3l2 2.2V14a1.3 1.3 0 0 1-2.6 0v-2"/></svg>;
+    case "decisions": return <svg className="nav-icon" viewBox="0 0 20 20" aria-hidden="true" {...props}><path d="M3.5 5.5h5m3 0h5m-13 9h5m3 0h5"/><circle cx="10" cy="5.5" r="1.5"/><circle cx="10" cy="14.5" r="1.5"/></svg>;
+    case "reports": return <svg className="nav-icon" viewBox="0 0 20 20" aria-hidden="true" {...props}><path d="M5 2.8h7l3 3V17H5z"/><path d="M12 3v3h3M7.5 10h5m-5 3h5"/></svg>;
+    case "settings": return <svg className="nav-icon" viewBox="0 0 20 20" aria-hidden="true" {...props}><circle cx="10" cy="10" r="2.6"/><path d="m16.7 11.5 1.1.8-1.5 2.6-1.3-.6a7 7 0 0 1-1.8 1l-.2 1.5H7l-.2-1.5a7 7 0 0 1-1.8-1l-1.3.6-1.5-2.6 1.1-.8a7 7 0 0 1 0-2.1l-1.1-.8 1.5-2.6 1.3.6a7 7 0 0 1 1.8-1L7 4h6l.2 1.5a7 7 0 0 1 1.8 1l1.3-.6 1.5 2.6-1.1.8a7 7 0 0 1 0 2.2Z"/></svg>;
+  }
+}
+
 function toDateTimeInput(value: Date) {
   return new Date(value.getTime() - value.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
@@ -553,13 +574,13 @@ export default function App() {
   if (!demoSignedIn) return (
     <main className="login-page">
       <section className="login-brand-panel">
-        <a className="login-brand" href="#overview"><span className="brand-mark" aria-hidden="true">↗</span><span><strong>Fleet Intelligence</strong><small>Connected fleets. Clear decisions.</small></span></a>
+        <a className="login-brand" href="#overview"><span className="brand-mark"><ProductMark /></span><span><strong>Fleet Intelligence</strong><small>Connected fleets. Clear decisions.</small></span></a>
         <div className="login-brand-message"><span className="eyebrow">FLEET OPERATIONS PLATFORM</span><h1>Connected vehicles.<br />Smarter decisions.</h1><p>Bring vehicle activity, alerts, and fleet signals into one clear workspace.</p></div>
         <div className="login-brand-foot">Local demonstration · Synthetic fleet data</div>
       </section>
       <section className="login-card-wrap">
         <div className="login-card panel">
-          <div className="login-mobile-brand"><span className="brand-mark" aria-hidden="true">↗</span><strong>Fleet Intelligence</strong></div>
+          <div className="login-mobile-brand"><span className="brand-mark"><ProductMark /></span><strong>Fleet Intelligence</strong></div>
           <span className="eyebrow">WELCOME</span>
           <h2>Open your fleet workspace</h2>
           <p className="login-copy">Explore the local demo using synthetic vehicle data.</p>
@@ -575,18 +596,19 @@ export default function App() {
     <div className="app-layout">
       <aside className="sidebar" aria-label="Fleet sections">
         <a className="brand" href="#overview" aria-label="Fleet Intelligence Platform home">
-          <span className="brand-mark" aria-hidden="true">↗</span>
+          <span className="brand-mark"><ProductMark /></span>
           <span className="brand-name">Fleet Intelligence</span>
         </a>
         <nav className="side-nav">
-          <a className={`nav-item${activeSection === "overview" ? " selected" : ""}`} href="#overview"><span>⌂</span>Dashboard</a>
-          <a className={`nav-item${activeSection === "map" ? " selected" : ""}`} href="#map"><span>◉</span>Fleet overview</a>
-          <a className={`nav-item${activeSection === "alerts" ? " selected" : ""}`} href="#alerts"><span>♧</span>Alerts</a>
-          <a className={`nav-item${activeSection === "analytics" ? " selected" : ""}`} href="#analytics"><span>▥</span>Analytics</a>
-          <a className={`nav-item${activeSection === "vehicles" ? " selected" : ""}`} href="#vehicles"><span>▣</span>Vehicles <small>{overview.vehicles_seen}</small></a>
-          <a className={`nav-item${activeSection === "fuel" ? " selected" : ""}`} href="#fuel"><span>◉</span>Fuel</a>
-          <a className={`nav-item${activeSection === "reports" ? " selected" : ""}`} href="#reports"><span>▤</span>Reports</a>
-          <a className={`nav-item${activeSection === "settings" ? " selected" : ""}`} href="#settings"><span>⚙</span>Settings</a>
+          <a className={`nav-item${activeSection === "overview" ? " selected" : ""}`} href="#overview"><NavigationIcon name="dashboard" />Dashboard</a>
+          <a className={`nav-item${activeSection === "map" ? " selected" : ""}`} href="#map"><NavigationIcon name="fleet" />Fleet overview</a>
+          <a className={`nav-item${activeSection === "alerts" ? " selected" : ""}`} href="#alerts"><NavigationIcon name="alerts" />Alerts</a>
+          <a className={`nav-item${activeSection === "analytics" ? " selected" : ""}`} href="#analytics"><NavigationIcon name="analytics" />Analytics</a>
+          <a className={`nav-item${activeSection === "vehicles" ? " selected" : ""}`} href="#vehicles"><NavigationIcon name="vehicles" />Vehicles <small title={`${overview.vehicles_seen.toLocaleString()} vehicles`}>{overview.vehicles_seen >= 1000 ? `${(overview.vehicles_seen / 1000).toFixed(overview.vehicles_seen >= 100000 ? 0 : 1)}K` : overview.vehicles_seen}</small></a>
+          <a className={`nav-item${activeSection === "fuel" ? " selected" : ""}`} href="#fuel"><NavigationIcon name="fuel" />Fuel management</a>
+          <a className={`nav-item${activeSection === "decisions" ? " selected" : ""}`} href="#decisions"><NavigationIcon name="decisions" />Decisions</a>
+          <a className={`nav-item${activeSection === "reports" ? " selected" : ""}`} href="#reports"><NavigationIcon name="reports" />Reports</a>
+          <a className={`nav-item${activeSection === "settings" ? " selected" : ""}`} href="#settings"><NavigationIcon name="settings" />Settings</a>
         </nav>
         <div className="sidebar-footer">Connected data.<br />Clear decisions.</div>
       </aside>
@@ -597,6 +619,7 @@ export default function App() {
           <label className="global-search"><span aria-hidden="true">⌕</span><span className="sr-only">Search vehicles and alerts</span><input value={globalSearch} onChange={(event) => { setGlobalSearch(event.target.value); setVehicleFilter(event.target.value); setAlertSearch(event.target.value); }} placeholder="Search vehicles, alerts…" /></label>
           <div className="topbar-right">
             <span className="workspace-label">Live synthetic fleet · local</span>
+            <button className="notification-button" type="button" aria-label={`View ${overview.open_alerts} open alerts`} title={`${overview.open_alerts.toLocaleString()} open alerts`} onClick={() => { setActiveSection("alerts"); window.location.hash = "alerts"; }}><NavigationIcon name="alerts" /><span>{overview.open_alerts > 99 ? "99+" : overview.open_alerts}</span></button>
             <span className="avatar" aria-label="Demo operator">DO</span>
             <button className="sign-out-button" type="button" onClick={() => { sessionStorage.removeItem("fleet-demo-session"); setDemoSignedIn(false); }}>Sign out</button>
           </div>
@@ -637,8 +660,7 @@ export default function App() {
 
           <section className="metrics overview-metrics" aria-label="Fleet summary">
             <article className="metric-card panel"><div className="metric-top"><span>Total vehicles</span><span className="metric-icon blue">▣</span></div><strong>{loading ? "—" : overview.vehicles_seen.toLocaleString()}</strong><small>Vehicles with telemetry observed</small></article>
-            <article className="metric-card panel"><div className="metric-top"><span>Moving now</span><span className="metric-icon green">↗</span></div><strong>{loading ? "—" : overview.moving_now.toLocaleString()}</strong><small>Latest signal within 5 minutes</small></article>
-            <article className="metric-card panel"><div className="metric-top"><span>Idling now</span><span className="metric-icon orange">Ⅱ</span></div><strong>{loading ? "—" : overview.idling_now.toLocaleString()}</strong><small>Engine on · stationary</small></article>
+            <article className="metric-card panel"><div className="metric-top"><span>Active now</span><span className="metric-icon green">↗</span></div><strong>{loading ? "—" : (overview.moving_now + overview.idling_now).toLocaleString()}</strong><small>Moving or idling · last 5 minutes</small></article>
             <article className="metric-card panel"><div className="metric-top"><span>Open alerts</span><span className="metric-icon red">!</span></div><strong>{loading ? "—" : overview.open_alerts.toLocaleString()}</strong><small>Require fleet operator attention</small></article>
             <article className="metric-card panel"><div className="metric-top"><span>Fuel spend · this month</span><span className="metric-icon orange">₹</span></div><strong>{fuelLoading || fuelError ? "—" : formatRupees(fuelSummary?.month_cost ?? 0)}</strong><small>{fuelSummary?.month_purchase_count ?? 0} simulated fuel stops</small></article>
           </section>
@@ -689,9 +711,10 @@ export default function App() {
             </article>
 
             <aside className="side-panels">
-              <section className="location-panel panel">
-                <div className="mini-heading"><div><h2>Latest locations</h2><p>Reported coordinates · {vehicles.length} vehicles</p></div><span className="location-icon">⌖</span></div>
-                {error ? <div className="mini-empty">Vehicle locations are unavailable while the API is offline.</div> : vehicles.slice(0, 4).length === 0 ? <div className="mini-empty">Vehicle locations will appear after telemetry arrives.</div> : <ul className="location-list">{vehicles.slice(0, 4).map((vehicle) => <li key={vehicle.vehicle_id}><span className={`location-dot vehicle-${vehicle.status}`} /><span className="location-copy"><strong title={vehicle.vehicle_id}>{displayVehicleId(vehicle.vehicle_id)}</strong><small>{formatCoordinate(vehicle.latitude, vehicle.longitude)}</small></span><span className="location-speed">{vehicle.speed_kmh.toFixed(0)} km/h</span></li>)}</ul>}
+              <section className="dashboard-map panel">
+                <div className="mini-heading"><div><h2>Live fleet map</h2><p>Latest reported vehicle positions</p></div><button className="map-open-button" type="button" onClick={() => { setActiveSection("map"); window.location.hash = "map"; }}>Full map <span aria-hidden="true">↗</span></button></div>
+                {error ? <div className="mini-empty">Vehicle locations are unavailable while the API is offline.</div> : vehicles.length === 0 ? <div className="mini-empty">Map points will appear as telemetry arrives.</div> : activeSection === "overview" && settings.showLocations ? <FleetMap vehicles={visibleVehicles} /> : <div className="dashboard-map-placeholder"><span>⌖</span><strong>{settings.showLocations ? `${vehicles.length} recent positions` : "Map locations hidden"}</strong><small>{settings.showLocations ? "Select Full map to explore the live fleet." : "Turn on vehicle locations in Settings."}</small></div>}
+                <div className="dashboard-map-legend"><span><i className="legend-green" />Moving</span><span><i className="legend-orange" />Idling</span><span><i className="legend-gray" />Offline</span></div>
               </section>
 
               <section className="recent-alerts panel">

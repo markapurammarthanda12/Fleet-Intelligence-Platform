@@ -637,3 +637,114 @@ tbody tr:hover { background: #fbfcff; }
 }
 
 .compact-table-note { display: none; }
+
+/* Reference finish: higher contrast navigation, readable operational data, and a live map in the overview. */
+body { background: #f1f5fb; }
+.app-layout { background: #f1f5fb; grid-template-columns: 218px minmax(0, 1fr); }
+.sidebar { width: 218px; padding: 19px 13px 16px; border-right-color: #1b3558; background: linear-gradient(180deg, #081d3a 0%, #0c2547 58%, #0a203f 100%); }
+.sidebar .brand { min-height: 58px; gap: 10px; padding: 3px 9px 17px; border-bottom-color: rgb(203 220 244 / 12%); }
+.sidebar .brand-mark { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 9px; background: linear-gradient(145deg, #112d54, #102849); }
+.product-mark { display: block; width: 25px; height: 25px; }
+.sidebar .brand-name { color: #f7faff; font-size: 13px; letter-spacing: -.25px; }
+.side-nav { gap: 5px; padding-top: 17px; }
+.nav-item { min-height: 39px; gap: 11px; padding: 0 11px; border-radius: 7px; color: #c1cfe1; font-size: 11px; transition: background .16s ease, color .16s ease, transform .16s ease; }
+.nav-item:hover { background: rgb(255 255 255 / 7%); color: #fff; }
+.nav-item > .nav-icon { width: 16px; height: 16px; flex: 0 0 16px; color: #a9bad0; }
+.nav-item.selected { background: linear-gradient(100deg, #2164ed, #3478ff); color: #fff; box-shadow: 0 4px 13px rgb(32 101 238 / 26%), inset 0 0 0 1px rgb(255 255 255 / 13%); }
+.nav-item.selected > .nav-icon { color: #fff; }
+.nav-item small { min-width: 27px; padding: 3px 5px; border-radius: 10px; background: rgb(255 255 255 / 11%); color: #d7e2f1; text-align: center; font-variant-numeric: tabular-nums; }
+.sidebar-footer { margin: auto 3px 0; padding: 13px 8px 0; border-top: 1px solid rgb(203 220 244 / 12%); background: transparent !important; color: #9eb2cb; font-size: 9px; line-height: 1.7; }
+.workspace { min-width: 0; background: #f1f5fb; }
+.workspace .topbar { height: 62px; gap: 20px; padding: 0 29px; background: rgb(255 255 255 / 97%); box-shadow: 0 2px 8px rgb(21 44 78 / 3%); }
+.breadcrumb { min-width: 115px; color: #213453; font-size: 11px; }
+.topbar-right { gap: 12px; }
+.workspace-label { padding: 6px 9px; border: 1px solid #e8edf5; border-radius: 14px; background: #f8faff; color: #72819a; font-size: 9px; }
+.notification-button { position: relative; display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #566984; }
+.notification-button:hover { background: #f0f4fb; color: #2e65dd; }
+.notification-button .nav-icon { width: 17px; height: 17px; }
+.notification-button > span { position: absolute; top: -3px; right: -5px; display: grid; min-width: 15px; height: 15px; place-items: center; padding: 0 3px; border: 2px solid #fff; border-radius: 10px; background: #ee5360; color: #fff; font-size: 7px; font-weight: 800; }
+.avatar { width: 30px; height: 30px; background: #eaf1ff; color: #2f62d5; }
+.content { max-width: 1680px; padding: 0 28px 28px; }
+.content .page-heading { padding-top: 23px; padding-bottom: 16px; }
+.content .eyebrow { color: #6680ad; font-size: 8px; letter-spacing: 1.2px; }
+.content h1 { color: #10284a; font-size: 25px; letter-spacing: -.65px; }
+.content .subtitle { color: #71819a; font-size: 11px; }
+.data-freshness { color: #71819a; font-size: 9px; }
+.refresh-button { min-height: 33px; border-radius: 7px; color: #435a79; }
+.overview-metrics { gap: 12px; margin-bottom: 13px; }
+.overview-metrics .metric-card { min-width: 0; min-height: 98px; padding: 13px 15px; border-color: #e5ebf4; border-radius: 10px; box-shadow: 0 3px 12px rgb(22 49 88 / 4%); }
+.overview-metrics .metric-card strong { color: #122a4a; font-size: 23px; font-variant-numeric: tabular-nums; }
+.overview-metrics .metric-card small { color: #8391a7; font-size: 9px; }
+.metric-top { color: #687b98; font-size: 10px; }
+.metric-icon { width: 25px; height: 25px; border-radius: 8px; }
+.overview-charts { gap: 13px; margin-bottom: 13px; }
+.chart-card, .fleet-section, .dashboard-map, .recent-alerts, .alert-center, .reports-section, .analytics-screen, .settings-screen, .decisions-screen, .fuel-screen, .fleet-map-view { border-color: #e4eaf3; border-radius: 10px; box-shadow: 0 3px 12px rgb(22 49 88 / 4%); }
+.chart-card { padding: 14px 16px 12px; }
+.chart-card-heading h2, .fleet-section .section-heading h2 { color: #1c3152; font-size: 12px; }
+.chart-card-heading p, .fleet-section .section-heading p { color: #8190a6; font-size: 9px; }
+.line-chart-wrap, .fleet-line-chart { height: 112px; }
+.status-donut { width: 122px; height: 122px; flex-basis: 122px; }
+.status-donut > div { width: 83px; height: 83px; }
+.status-legend li, .status-legend strong { font-size: 9px; }
+.overview-grid { grid-template-columns: minmax(0, 1.58fr) minmax(300px, .92fr) !important; gap: 13px; }
+.fleet-section { overflow: hidden; }
+.fleet-section .section-heading { padding: 14px 16px 11px; }
+.fleet-section th { height: 38px; font-size: 8px; }
+.fleet-section td { height: 50px; font-size: 9px; }
+.section-actions { gap: 8px; }
+.last-updated { font-size: 8px; }
+.side-panels { gap: 12px; }
+.dashboard-map, .recent-alerts { overflow: hidden; }
+.dashboard-map .mini-heading, .recent-alerts .mini-heading { padding: 12px 13px 10px; }
+.dashboard-map .mini-heading h2, .recent-alerts .mini-heading h2 { color: #203453; font-size: 11px; }
+.dashboard-map .mini-heading p, .recent-alerts .mini-heading p { color: #8795aa; font-size: 8px; }
+.dashboard-map .fleet-map-frame { min-height: 215px; height: 215px; }
+.dashboard-map .fleet-map-canvas { height: 215px; }
+.dashboard-map .fleet-map-attribution-note { font-size: 6px; }
+.map-open-button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid #e4eaf3; border-radius: 6px; background: #fff; color: #3868dc; font-size: 8px; font-weight: 700; }
+.map-open-button:hover { border-color: #bdd0fb; background: #f6f8ff; }
+.dashboard-map-placeholder { display: grid; min-height: 215px; align-content: center; justify-items: center; gap: 6px; background: linear-gradient(145deg, #eff5fc, #e4edf8); color: #72819a; }
+.dashboard-map-placeholder > span { color: #3976e9; font-size: 26px; }
+.dashboard-map-placeholder strong { color: #354a69; font-size: 10px; }
+.dashboard-map-placeholder small { font-size: 8px; }
+.dashboard-map-legend { display: flex; justify-content: space-around; gap: 8px; padding: 9px 10px; border-top: 1px solid #edf1f6; color: #6f7e96; font-size: 8px; }
+.dashboard-map-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.dashboard-map-legend i { width: 7px; height: 7px; border-radius: 50%; }
+.dashboard-map-legend .legend-gray { background: #a6b0bf; }
+.alert-list { padding-right: 13px; padding-left: 13px; }
+.alert-list li { padding: 9px 0; }
+.alert-copy strong { color: #354864; font-size: 8px; }
+.alert-copy small { font-size: 7px; }
+.estimate-note { color: #8694a8; font-size: 7px; }
+.panel { background: #fff; }
+.export-button, .primary-button { border-radius: 6px; }
+.fleet-map-heading { padding: 14px 17px; }
+.fleet-map-heading h2 { color: #1c3152; font-size: 13px; }
+.fleet-map-heading p { color: #8190a6; font-size: 9px; }
+.map-vehicle-copy strong { color: #304563; font-size: 9px; }
+.map-vehicle-copy small { color: #8795aa; font-size: 8px; }
+.map-status-tag { font-size: 8px; }
+.alert-center, .reports-section, .analytics-screen, .settings-screen, .decisions-screen, .fuel-screen { background: #fff; }
+.alert-center .section-heading, .reports-section .section-heading { padding: 17px 19px 14px; }
+.alert-center h2, .reports-section h2, .analytics-screen h2, .settings-screen h2, .decisions-screen h2, .fuel-screen h2 { color: #1a3152; }
+.alert-center .section-heading p, .reports-section .section-heading p { color: #8190a6; font-size: 10px; }
+.alert-center th, .reports-section th { font-size: 8px; }
+.alert-center td, .reports-section td { font-size: 9px; }
+.nav-item:focus-visible, .notification-button:focus-visible, .map-open-button:focus-visible { outline: 2px solid #83a7ff; outline-offset: 2px; }
+@media (max-width: 1080px) {
+  .app-layout { grid-template-columns: 205px minmax(0, 1fr); }
+  .sidebar { width: 205px; }
+  .content { padding-right: 20px; padding-left: 20px; }
+  .overview-grid { grid-template-columns: minmax(0, 1.4fr) minmax(265px, .9fr) !important; }
+}
+@media (max-width: 700px) {
+  .app-layout { display: block; }
+  .sidebar { width: 100%; background: #081d3a; }
+  .sidebar .brand { padding-bottom: 8px; }
+  .workspace-label { display: none; }
+  .side-nav { overflow-x: auto; }
+  .nav-item { white-space: nowrap; }
+  .content { padding-right: 14px; padding-left: 14px; }
+  .overview-grid { grid-template-columns: 1fr !important; }
+  .dashboard-map .fleet-map-frame, .dashboard-map .fleet-map-canvas, .dashboard-map-placeholder { min-height: 220px; height: 220px; }
+}
