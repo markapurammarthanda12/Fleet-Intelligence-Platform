@@ -12,6 +12,7 @@ The current ordered work and evidence status is tracked in [the project checklis
 - `2026-10-01/screenshot-capture.md` records the local app, capture time, viewport, counts, and interpretation limits for the images below.
 - `2026-10-02/runtime-and-query-plan-check.md` records the latest Docker/API/database check and the V7 Alerts query-plan comparison.
 - `2026-10-02/api-latency-smoke-check.md` records a 20-request-per-endpoint local latency smoke sample and the observed 5 events/second simulator rate. It is not a load benchmark and does not verify any target-scale requirement.
+- `2026-10-02/bounded-ingest-smoke-test.md` records a low-rate 2/5/10 events/second synthetic ingest run, acknowledgement and event-to-PostgreSQL percentiles, and its scope limits. It does not verify 100K events/second or the end-to-end targets.
 - [`2026-10-01/dashboard-overview.jpg`](2026-10-01/dashboard-overview.jpg) shows the Overview page.
 - [`2026-10-01/alerts.jpg`](2026-10-01/alerts.jpg) shows the Alerts page.
 
@@ -19,7 +20,7 @@ The screenshots are embedded in Section 3.1 of [`docs/Fleet_Intelligence_Solutio
 
 ## Still required for the submission
 
-- Reproducible load/soak results at 100,000 events/second and a 3x five-minute burst, with throughput, p95/p99, errors, lost events, and consumer lag.
+- Reproducible load/soak results at 100,000 events/second and a 3x five-minute burst, with throughput, p95/p99, errors, lost events, and consumer lag. The bounded low-rate smoke run above is not a substitute.
 - Critical-alert and ingest-to-dashboard end-to-end latency results.
 - Broker/service failure-recovery results and a multi-node availability demonstration.
 - Coverage, contract/acceptance, security scan, and chaos test reports.
