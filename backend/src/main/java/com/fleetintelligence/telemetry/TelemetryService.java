@@ -49,6 +49,16 @@ public class TelemetryService {
                 event.speedKmh(),
                 event.engineOn(),
                 event.sequence());
+        jdbcTemplate.update("""
+                INSERT INTO tenants (tenant_id) VALUES (?)
+                ON CONFLICT (tenant_id) DO NOTHING
+                """, event.tenantId());
+        jdbcTemplate.update("""
+                INSERT INTO vehicles (tenant_id, vehicle_id) VALUES (?, ?)
+                ON CONFLICT (tenant_id, vehicle_id) DO NOTHING
+                """, event.tenantId(), event.vehicleId());
+
+
         if (inserted == 0) {
             return true;
         }
