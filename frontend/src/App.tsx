@@ -353,12 +353,12 @@ export default function App() {
   }, [demoSignedIn, refresh, settings.realTimeAlerts]);
 
   useEffect(() => {
-    if (!demoSignedIn) return;
+    if (!demoSignedIn || !["overview", "fuel"].includes(activeSection)) return;
     void refreshFuel();
     if (!settings.realTimeAlerts) return;
-    const timer = window.setInterval(() => void refreshFuel(), 5000);
+    const timer = window.setInterval(() => void refreshFuel(), 15000);
     return () => window.clearInterval(timer);
-  }, [demoSignedIn, refreshFuel, settings.realTimeAlerts]);
+  }, [activeSection, demoSignedIn, refreshFuel, settings.realTimeAlerts]);
 
   useEffect(() => {
     const syncSection = () => setActiveSection(window.location.hash.slice(1) || "overview");
@@ -367,7 +367,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!demoSignedIn) return;
+    if (!demoSignedIn || !["analytics", "reports"].includes(activeSection)) {
+      setAnalyticsLoading(false);
+      return;
+    }
     if (!analyticsFrom || !analyticsTo) return;
     const from = new Date(analyticsFrom);
     const to = new Date(analyticsTo);
@@ -381,15 +384,18 @@ export default function App() {
 
     let active = true;
     let initialLoad = true;
+    let requestInFlight = false;
     const query = new URLSearchParams({
       tenant_id: DEMO_TENANT_ID,
       from: from.toISOString(),
       to: to.toISOString(),
     });
-    const refreshAnalytics = () => {
+    const refreshAnalytics = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
       if (initialLoad) setAnalyticsLoading(true);
-      fetch(`/api/v1/analytics/telemetry/hourly?${query.toString()}`, { headers: { Accept: "application/json" } })
-        .then(async (response) => {
+      try {
+        const response = await fetch(`/api/v1/analytics/telemetry/hourly?${query.toString()}`, { headers: { Accept: "application/json" } });
           if (response.status === 404) {
             throw new Error("Reports are not enabled in the currently running API. Update the local application image to enable this section.");
           }
@@ -397,32 +403,31 @@ export default function App() {
             throw new Error("The historical analytics store is not ready. Check that ClickHouse is running.");
           }
           if (!response.ok) throw new Error(`Reports could not be loaded (HTTP ${response.status}).`);
-          return response.json() as Promise<Array<Record<string, unknown>>>;
-        })
-        .then((rows) => {
-          if (!active) return;
+        const rows = await response.json() as Array<Record<string, unknown>>;
+        if (active) {
           setAnalytics(rows.map(normalizeAnalytics));
           setAnalyticsError("");
-        })
-        .catch((cause) => {
-          if (!active) return;
+        }
+      } catch (cause) {
+        if (active) {
           setAnalyticsError(cause instanceof Error ? cause.message : "Historical analytics are unavailable.");
           setAnalytics([]);
-        })
-        .finally(() => {
-          if (active && initialLoad) {
-            initialLoad = false;
-            setAnalyticsLoading(false);
-          }
-        });
+        }
+      } finally {
+        requestInFlight = false;
+        if (active && initialLoad) {
+          initialLoad = false;
+          setAnalyticsLoading(false);
+        }
+      }
     };
-    refreshAnalytics();
-    const timer = settings.realTimeAlerts ? window.setInterval(refreshAnalytics, 5000) : undefined;
+    void refreshAnalytics();
+    const timer = settings.realTimeAlerts ? window.setInterval(() => void refreshAnalytics(), 60000) : undefined;
     return () => {
       active = false;
       if (timer !== undefined) window.clearInterval(timer);
     };
-  }, [analyticsFrom, analyticsTo, demoSignedIn, settings.realTimeAlerts]);
+  }, [activeSection, analyticsFrom, analyticsTo, demoSignedIn, settings.realTimeAlerts]);
 
   useEffect(() => {
     if (!selectedVehicleId) {
