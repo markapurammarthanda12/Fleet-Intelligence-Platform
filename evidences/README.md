@@ -11,6 +11,7 @@ The current ordered work and evidence status is tracked in [the project checklis
 - `2026-10-01/current-stack-recheck.md` records the latest read-only runtime and build checks.
 - `2026-10-01/screenshot-capture.md` records the local app, capture time, viewport, counts, and interpretation limits for the images below.
 - `2026-10-02/runtime-and-query-plan-check.md` records the latest Docker/API/database check and the V7 Alerts query-plan comparison.
+- `2026-10-02/api-latency-smoke-check.md` records a 20-request-per-endpoint local latency smoke sample and the observed 5 events/second simulator rate. It is not a load benchmark and does not verify any target-scale requirement.
 - [`2026-10-01/dashboard-overview.jpg`](2026-10-01/dashboard-overview.jpg) shows the Overview page.
 - [`2026-10-01/alerts.jpg`](2026-10-01/alerts.jpg) shows the Alerts page.
 
