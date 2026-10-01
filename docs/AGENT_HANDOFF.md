@@ -1,6 +1,6 @@
 ## Current status and source of truth (2026-10-01)
 
-Start with [docs/PROJECT_CHECKLIST.md](PROJECT_CHECKLIST.md) for priority order and completion status, and [docs/REQUIREMENTS_MATRIX.md](REQUIREMENTS_MATRIX.md) for the requirement-by-requirement gaps. These files supersede older “next work” lists and snapshots elsewhere in this handoff. CI failure for commit 6a4a082 was traced to missing tenant/vehicle registration before dependent writes; fix commit 97c160b has a passing Actions run: 
+Start with [docs/PROJECT_CHECKLIST.md](PROJECT_CHECKLIST.md) for priority order and completion status, and [docs/REQUIREMENTS_MATRIX.md](REQUIREMENTS_MATRIX.md) for the requirement-by-requirement gaps. These files supersede older “next work” lists and snapshots elsewhere in this handoff. CI failure for commit 6a4a082 was traced to missing tenant/vehicle registration before dependent writes; fix commit 97c160b has a passing Actions run: [CI run 36866785103](https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36866785103) 
 . The current workspace cannot access the local Docker socket (permission denied), so it has not rechecked the persistent database in this continuation; dated runtime records below describe earlier successful Mac checks and should be treated as historical until reverified.
 
 # Fleet Intelligence Platform — Agent Handoff
