@@ -2,9 +2,9 @@
 
 The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, explainable fleet decisions. It brings together vehicle activity, trips, health signals, operational alerts, and cost insights so fleet teams can see what is happening and decide what to do. Prolonged idling is the first example workflow used to prove the end-to-end system; it is not the product's full scope. Later workflows can cover maintenance risk, utilisation, safety, and fleet-wide reporting. This repository is the starting MVP for the Motorq connected-vehicle hackathon; it uses synthetic data and has no affiliation with Motorq.
 
-## Runtime status — 2026-10-01
+## Runtime status — 2026-10-01 (latest recorded local check)
 
-The persistent local PostgreSQL volume has Flyway V1–V6 applied. On 2026-10-01 the API image was rebuilt and only the API container was recreated; PostgreSQL and its volume, dashboard, Kafka, ClickHouse, and simulator were preserved. API readiness, dashboard, Alerts, Analytics, and Reports were checked against the running synthetic fleet. PostgreSQL contains 100,003 vehicle rows, 2 tenants, and 945,452 telemetry events; the overview represents 100,000 fleet vehicles. See the [dated runtime evidence](evidences/2026-10-01/local-stack-check.md) and [evidence index](evidences/README.md). This is a local runtime check, not clean-clone startup, soak, load, high-availability, or challenge-scale performance evidence. Fuel and emissions remain illustrative estimates.
+The persistent local Compose database has Flyway V1–V6 applied. The API was rebuilt and only its container recreated; PostgreSQL and its volume, dashboard, Kafka, ClickHouse, and simulator were preserved. API readiness, dashboard, Alerts, Analytics, and Reports were checked against the running synthetic fleet. PostgreSQL contains 100,003 vehicle rows, 2 tenants, and 945,452 telemetry events; the UI overview represents 100,000 fleet vehicles. These are local, time-specific checks, not a clean-clone startup, soak, load, availability, or challenge-scale performance result. Fuel and emissions figures are explicitly estimates. See the [dated runtime evidence](evidences/2026-10-01/local-stack-check.md) and [evidence index](evidences/README.md).
 
 ## Current implementation
 
@@ -28,16 +28,18 @@ The persistent local PostgreSQL volume has Flyway V1–V6 applied. On 2026-10-01
 
 | Deliverable | Current status | What remains |
 |---|---|---|
-| Dockerized, portable system | Compose defines Kafka, ClickHouse, PostgreSQL, API, dashboard, and an optional live-simulator profile. | Verify the latest rebuilt stack; local Kafka remains single-node |
-| Real-time ingestion and alerting | The API waits for Kafka broker acknowledgement; keyed consumer persists idempotently, retries failures, and routes exhausted retries to a dead-letter topic | Measure end-to-end latency and burst behavior at challenge scale; test dead-letter replay |
-| Relational and high-volume data | PostgreSQL holds transactional events, vehicle state, and alerts. ClickHouse schema and Kafka ingestion path are implemented for analytical history. | Verify ClickHouse consumes broker events end to end; add fleet metadata and evaluate retention/partition settings |
-| User interface | Overview, Vehicles, Alerts, Analytics, and Reports read API data. The Alert Center can acknowledge an open alert; Fuel Management records simulated refuelling batches via a one-click trigger. | Rebuild and verify the current Docker images; configure hosted interactive login |
-| Security, tests, and observability | OIDC JWT validation, scope checks, tenant claim isolation, and an integration scenario for unauthenticated/cross-tenant access; simulator tests and dashboard build run in GitHub Actions | Configure a hosted identity provider; add mTLS, TLS, audit events, masking/erasure, security scans, coverage reporting, and metrics/logs/traces |
-| Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
+| Dockerized local demo | Compose stack and the current local runtime have been checked; a 100,000-vehicle snapshot and 5 events/second simulator are available. | Fresh-clone startup and seeded data path need reproducible verification; local Kafka is single-node; cloud deployment is not demonstrated |
+| Real-time ingestion and alerting | Kafka ingestion, duplicate protection, retries/DLQ routing, idling alerts, acknowledgement, and hourly ClickHouse reports are implemented; recent local Reports request was about 0.2 seconds | Demonstrate event-to-dashboard and critical-alert timing; test DLQ replay and broker/service recovery |
+| Relational and analytical data | V6 passed fresh-database integration, a disposable 100K-row migration check, and was applied to the persistent local database; ClickHouse stores analytics with exact hourly rollups | Capture before/after `EXPLAIN ANALYZE`; document partitions, retention, and CAP trade-offs |
+| User interface | Overview, Vehicles, Alerts, Analytics, Reports, and simulated Fuel use API-backed data; local Dashboard and Alerts screenshots are saved in `evidences/2026-10-01/` and embedded in the solution draft | Hosted interactive OIDC sign-in remains unconfigured; Drivers, Routes, and Maintenance are previews; final-release and observability screenshots remain |
+| Security, tests, observability | API JWT validation and tenant/scope checks exist; GitHub CI covers simulator, backend integration, and frontend build | Configure a hosted identity provider; add/report coverage, contract/acceptance/load/security/chaos checks, TLS/mTLS, audit/privacy controls, and metrics/logs/traces |
+| Challenge-scale performance and availability | No challenge-scale target has been demonstrated | Measure 100K events/s, 3x five-minute burst, data loss, p95/p99, end-to-end latency, failover, and availability |
 
-Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, ClickHouse, PostgreSQL, dashboard, persistent volumes, and health checks. The current Docker stack was rebuilt and checked locally: the dashboard, API, PostgreSQL, Kafka, and ClickHouse are up, with database/broker health checks passing. The optional simulator is paused while the slow Reports query is optimized. This is not a claim of cloud portability, high availability, or challenge-scale performance.
+Docker is part of the deliverable. Compose defines the API, single-node local Apache Kafka broker, ClickHouse, PostgreSQL, dashboard, persistent volumes, and health checks. The last recorded local check had the dashboard, API, PostgreSQL, Kafka, ClickHouse, and optional simulator running, with database/broker health checks passing. The latest schema migration in this working copy has not yet been applied to that database. This is not a claim of cloud portability, high availability, or challenge-scale performance.
 
-The generator creates exactly 100,000 synthetic vehicle records and one current telemetry event per vehicle for a one-fleet snapshot. A separate optional stream changes positions and speed at a configurable rate. This does not claim that the current API sustains the challenge's 100,000 events/second target.
+The generator creates exactly 100,000 synthetic vehicle records and a base telemetry snapshot; the checked-in compressed dataset is described in [data/README.md](data/README.md), while generated uncompressed JSONL files are ignored by Git. A separate optional stream changes positions and speed at a configurable rate. This does not claim that the current API sustains the challenge's 100,000 events/second target.
+
+Track remaining work and evidence by priority in the [project checklist](docs/PROJECT_CHECKLIST.md). For new agents, the [handoff guide](docs/AGENT_HANDOFF.md) explains the project context and workflow.
 
 ## Quick start
 
@@ -54,26 +56,13 @@ Requires Docker Desktop. You do not need to install Java, Maven, Node.js, Spring
    ```
 
    Replace that example path with the folder where the repository is on your Mac. If you opened this project only inside Codex, the project files are in Codex's workspace; you do not need to type commands while the app is already running.
-4. Start the system:
+4. Start the complete local demo, including the API, dashboard, 100,000-vehicle seed, and live simulator:
 
    ```bash
-   docker compose up -d --build
+   bash scripts/start_demo.sh
    ```
 
-5. Generate and load the 100,000-vehicle fleet:
-
-   ```bash
-   bash scripts/generate_dataset.sh
-   bash scripts/load_dataset.sh
-   ```
-
-   Loading happens through Kafka and the API consumer; allow a few minutes for all vehicle states to appear. Then start the changing telemetry stream:
-
-   ```bash
-   docker compose --profile live-simulator up -d
-   ```
-
-6. Open `http://localhost:3000` in a browser. The app refreshes fleet metrics and locations every five seconds. The first start downloads the Java, Node, and Kafka images and can take several minutes.
+   First start builds images and generates/loads data, which can take several minutes. The script skips data generation when valid 100,000-row files are already present, then starts the changing telemetry stream. Open `http://localhost:3000` after it completes. The app refreshes fleet metrics and locations every five seconds.
 
 To start the already-built services in the background later, use `docker compose up -d`. To stop background services, use `docker compose down` from the same repository folder.
 
@@ -113,7 +102,7 @@ Local Kafka stores seven days of topic data across 12 partitions. For a replay o
 
 The sample password in `.env.example` is for a local demonstration only. Use a managed secret for any shared or deployed environment. `docker compose down` stops the services; `docker compose down -v` also removes the local database volume and its data.
 
-The overview only counts vehicles that have sent telemetry; it is not a registered-vehicle inventory. A vehicle is shown as moving or idling only when an engine-on event has arrived within five minutes. Engine-off vehicles and vehicles with stale telemetry are called out separately. Coordinates are displayed as reported by the vehicle; a map/geocoding provider is not connected. Drivers, Routes & Dispatch, and Maintenance remain sample-data previews. Fuel refuelling records are persisted in PostgreSQL; they are generated by a demo trigger with fixed prices and synthetic quantities. Potential CO₂ is an estimate based on fuel purchased, not directly measured tailpipe emissions. Analytics and Reports return hourly telemetry aggregates from ClickHouse. The live query currently takes about 21 seconds over the checked range and needs aggregation/query optimization before presentation. The separate fuel figure for idling alerts remains an assumption-based estimate, not measured savings.
+The overview only counts vehicles that have sent telemetry; it is not a registered-vehicle inventory. A vehicle is shown as moving or idling only when an engine-on event has arrived within five minutes. Engine-off vehicles and vehicles with stale telemetry are called out separately. Coordinates are displayed as reported by the vehicle; a map/geocoding provider is not connected. Drivers, Routes & Dispatch, and Maintenance remain sample-data previews. Fuel refuelling records are persisted in PostgreSQL; they are generated by a demo trigger with fixed prices and synthetic quantities. Potential CO₂ is an estimate based on fuel purchased, not directly measured tailpipe emissions. Analytics and Reports return hourly telemetry aggregates from ClickHouse; the latest recorded 37-hour query took about 0.2 seconds after aggregation optimization. This local request timing is not a challenge-scale performance result. The separate fuel figure for idling alerts remains an assumption-based estimate, not measured savings.
 
 To generate the fleet again, open **Terminal** in the project folder and run:
 
@@ -121,7 +110,7 @@ To generate the fleet again, open **Terminal** in the project folder and run:
 bash scripts/generate_dataset.sh
 ```
 
-This uses Docker to run the Python generator, so you do not need to install Python. It writes exactly 100,000 vehicle catalog rows and 100,000 base events (plus intentional duplicate-delivery examples) for the `tenant-100k` workspace under the project's `data/` folder. `scripts/load_dataset.sh` publishes those events to Kafka for normal database processing. To keep positions changing, start Compose with `--profile live-simulator`; change its rate with `SIMULATOR_EVENTS_PER_SECOND` in `.env`. These generated files stay local and are not committed to GitHub; the scripts and seed are committed so another developer can recreate the same fleet. No data collection from a physical vehicle is performed.
+This uses Docker to run the Python generator, so you do not need to install Python. It writes exactly 100,000 vehicle catalog rows and 100,000 base events (plus intentional duplicate-delivery examples) for the `tenant-100k` workspace under `data/`. Compressed `.gz` snapshots are kept in `data/`; uncompressed JSONL files are ignored by Git. `scripts/load_dataset.sh` publishes the events to Kafka for normal database processing. To keep positions changing independently, start Compose with `--profile live-simulator`; change its rate with `SIMULATOR_EVENTS_PER_SECOND` in `.env`. No data collection from physical vehicles is performed.
 
 ## Repository map
 
@@ -168,17 +157,17 @@ Fuel-use assumptions are illustrative and must be calibrated with documented fle
 
 ## Next milestones
 
-1. Continue monitoring Reports latency and CPU during a longer 5 events/second simulator run; retain exact-count results.
-2. Confirm map updates remain responsive through the longer run; pause the simulator if resource use rises sharply.
-3. Implement alert acknowledgement and hosted interactive OIDC login; keep Drivers, Routes, and Maintenance labeled as previews until implemented.
-4. Add reproducible coverage/throughput/latency/loss evidence, multi-broker deployment, dead-letter replay, observability, and cloud/IaC and solution-document/video deliverables.
+1. Capture final-release and observability evidence, and repeat functional evidence for the end-to-end simulator, API, dashboard, alerts, and Reports path. Current local product screenshots and limits are documented in `evidences/2026-10-01/screenshot-capture.md`.
+2. Run coverage, load/soak, security, and failure-recovery tests; publish measured results without presenting local snapshots as target certification.
+3. Configure hosted interactive OIDC login and production security/privacy controls.
+4. Verify the new 3NF ownership migration on fresh and existing 100K databases; add C4 diagrams, SQL plan comparisons, cloud deployment, STRIDE, the completed solution PDF, and the five-minute demo video.
 
 The latest backend optimization is commit `51192e36d674e890fedc360ac263bccc612b0285`; its GitHub Actions run passed. It stores each vehicle's latest reported coordinates and status in the runtime-state table, allowing fleet overview and vehicle-list queries to avoid rescanning telemetry history. The V4 migration is applied by the currently running API image. Local Maven is not required because the backend build runs in Docker/CI, but Maven is not available in the current shell.
+
+On 2026-10-01, `npm run build`, the three simulator unit tests (`PYTHONPATH=src python3.12 -m unittest discover -s tests -v`), `docker compose config --quiet`, and `bash -n scripts/start_demo.sh` passed. The app and alert routes were visually inspected in a browser and the console had no warnings/errors. The dated build/test record is in [evidences/2026-10-01/build-and-simulator-tests.md](evidences/2026-10-01/build-and-simulator-tests.md). Dashboard and Alerts screenshots are now stored under `evidences/2026-10-01/` and embedded in Section 3.1 of the solution draft; their counts, capture times, and limitations are recorded in `screenshot-capture.md`.
 
 See [the project brief](docs/PROJECT_BRIEF.md) and [architecture notes](docs/ARCHITECTURE.md).
 
 For a complete continuation brief—including the challenge acceptance criteria, prior decisions, verified state, known gaps, and next steps for a new agent—read [the agent handoff guide](docs/AGENT_HANDOFF.md).
 
-
-## Current task list
-See [the prioritized project checklist](docs/PROJECT_CHECKLIST.md) for work marked complete and remaining items. The [requirements evidence matrix](docs/REQUIREMENTS_MATRIX.md) distinguishes implemented features from hackathon targets that still need proof.
+For the live priority list, completion status, and external dependencies, see the [project work checklist](docs/PROJECT_CHECKLIST.md).

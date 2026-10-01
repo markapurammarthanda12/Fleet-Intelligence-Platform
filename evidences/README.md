@@ -9,11 +9,11 @@ The current ordered work and evidence status is tracked in [the project checklis
 - `2026-10-01/local-stack-check.md` records the live Docker/API/dashboard checks and their limits.
 - `2026-10-01/build-and-simulator-tests.md` records repeatable source-level validation.
 - `2026-10-01/current-stack-recheck.md` records the latest read-only runtime and build checks.
+- `2026-10-01/screenshot-capture.md` records the local app, capture time, viewport, counts, and interpretation limits for the images below.
+- [`2026-10-01/dashboard-overview.jpg`](2026-10-01/dashboard-overview.jpg) shows the Overview page.
+- [`2026-10-01/alerts.jpg`](2026-10-01/alerts.jpg) shows the Alerts page.
 
-Dashboard and Alerts were visually inspected in the running local app on 2026-10-01. The browser displayed both captures, but this environment could not save them as image files in the repository. The following placeholder guides reserve the filenames and explain what to capture; replace them with actual images before submission:
-
-- [`dashboard-overview.placeholder.md`](2026-10-01/dashboard-overview.placeholder.md) → `dashboard-overview.jpg`
-- [`alerts.placeholder.md`](2026-10-01/alerts.placeholder.md) → `alerts.jpg`
+The screenshots are embedded in Section 3.1 of [`docs/Fleet_Intelligence_Solution_Document_DRAFT.docx`](../docs/Fleet_Intelligence_Solution_DRAFT.docx). They show a synthetic local demo only. The Alerts page reports 1,809 open records overall but displays 200 loaded rows; all 200 were Critical and 0 Warning at capture. This paginated snapshot does not establish that there were no warnings outside the loaded rows.
 
 ## Still required for the submission
 
@@ -22,8 +22,6 @@ Dashboard and Alerts were visually inspected in the running local app on 2026-10
 - Broker/service failure-recovery results and a multi-node availability demonstration.
 - Coverage, contract/acceptance, security scan, and chaos test reports.
 - Query-plan evidence (`EXPLAIN ANALYZE` before and after optimization).
-- Final system/observability screenshots captured against the release candidate.
+- Final system/observability screenshots captured against the release candidate, including observability metrics not shown in these product screenshots.
 
-Screenshots show the local synthetic demo only. They do not prove cloud deployment, real vehicle connectivity, or the performance targets.
-
-The screenshot placeholder guides are organizational aids only; they are not screenshot evidence and should not be submitted as image files.
+The screenshots do not prove cloud deployment, real vehicle connectivity, performance targets, availability, or production security.

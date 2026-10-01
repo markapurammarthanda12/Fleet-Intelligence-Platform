@@ -1,9 +1,12 @@
-## Current status and source of truth (2026-10-01)
-
-Start with [docs/PROJECT_CHECKLIST.md](PROJECT_CHECKLIST.md) for priority order and completion status, and [docs/REQUIREMENTS_MATRIX.md](REQUIREMENTS_MATRIX.md) for the requirement-by-requirement gaps. These files supersede older “next work” lists and snapshots elsewhere in this handoff. CI failure for commit 6a4a082 was traced to missing tenant/vehicle registration before dependent writes; fix commit 97c160b has a passing Actions run: [CI run 36866785103](https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36866785103) 
-. This 2026-10-01 continuation verified the persistent local Docker database after applying V6; latest results and remaining priorities are in the checklist and dated evidence linked below. Use that record over older runtime snapshots in this handoff.
-
 # Fleet Intelligence Platform — Agent Handoff
+
+## Current status — 2026-10-02 (use this section over older dated notes)
+
+The local persistent Compose database has Flyway V1–V6 applied. On 2026-10-01 the API image was rebuilt and only the API container replaced; PostgreSQL and its volume, dashboard, Kafka, ClickHouse, and simulator were preserved. API readiness and the dashboard, Alerts, Analytics, and Reports routes were checked with the live synthetic dataset. Database totals were 100,003 vehicle records, 2 tenants, and 945,452 telemetry events. The overview represented 100,000 vehicles. See [`evidences/2026-10-01/local-stack-check.md`](../evidences/2026-10-01/local-stack-check.md) and [`evidences/README.md`](../evidences/README.md).
+
+**Screenshot milestone completed:** Dashboard Overview and Alerts screenshots from the running local synthetic demo are saved in `evidences/2026-10-01/` and embedded in Section 3.1 of `docs/Fleet_Intelligence_Solution_Document_DRAFT.docx`. Capture details and the Alerts pagination caveat are in `evidences/2026-10-01/screenshot-capture.md`. The draft still has yellow-highlighted user inputs and unverified deliverable placeholders. Still open at P0: verify one-command startup on a clean checkout with a disposable empty database; publish and verify the latest handoff, evidence files, and document on GitHub; complete and visually inspect the solution document. No throughput, soak, p95/p99, event-loss, failover, cloud deployment, or 99.9% availability target has been demonstrated. Fuel and CO2 are estimates. The latest dated runtime note is more authoritative than historical status sections below.
+
+---
 
 This document is the durable project brief for any coding agent or teammate continuing the repository. Read it together with `README.md`, `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`, the ADRs, and the original hackathon problem statement before changing direction.
 
@@ -110,17 +113,7 @@ Important review points before claiming completion:
 
 ## 7. Remaining project work (ordered, update as completed)
 
-1. Investigate the Docker image build delay at Maven `dependency:go-offline`. CI proves compilation/tests pass, but the current local running API/dashboard are the earlier images. Adjust the Dockerfile/build path if needed, rebuild the services without deleting volumes, then verify `docker compose ps`, `/actuator/health/readiness`, fleet API and the dashboard browser. Record actual results.
-2. Implement hosted OIDC browser sign-in after the user configures an identity provider, client ID, redirect URL and required claims/scopes. The local synthetic-data demo entry/sign-out flow is implemented, but is not authentication.
-3. Produce a structured status/requirements matrix against the full PDF, including evidence and gaps. Fill in the provided solution document template with honest architecture, test and performance results; render/review the result.
-4. Improve the simulator: trips, diagnostic/fault events, controlled out-of-order and duplicate rates, configurable bursts, and reproducible event-volume presets. Generate/seed 100K data in the demo path without checking giant generated output into Git.
-5. Add fleet metadata/ownership schema and ER diagram; document 3NF and partitioning. Add time-series or columnar storage only after an explicit benchmark/design choice; provide a relational/NoSQL/polyglot rationale.
-6. Verify the new ClickHouse batch analytics and Reports workflow end to end with generated history; add exports after the data path is proven.
-7. Add keyset pagination, rate limits, authorization/audit/privacy lifecycle, retention, masking, and right-to-erasure tests. Add device authentication/mTLS and TLS for deployed environments.
-8. Add dead-letter inspection/replay tooling, broker restart/consumer recovery evidence, multi-broker configuration, and cloud deployment artifacts. Choose a cloud/deployment target with the user if credentials/hosting are needed; maintain no-code-change portability.
-9. Add metrics/logs/traces, security/dependency/image scanning, coverage reports and contract/acceptance tests. Validate test claims by exact CI artifacts, not workflow existence alone.
-10. Benchmark API p95/p99, critical-alert and ingest-to-dashboard latency, throughput/error rate/consumer lag, 3x five-minute bursts and soak behavior. Do not claim challenge NFRs until measured, repeatable evidence exists.
-11. Complete STRIDE threat model, algorithm complexity write-up, SQL `EXPLAIN ANALYZE` before/after, 3–5 ADRs, final demo script/video (max five minutes), and final `v1.0submission` tag before the challenge deadline.
+The live priority list is [docs/PROJECT_CHECKLIST.md](PROJECT_CHECKLIST.md). It records completed work, remaining work, evidence links, and blockers; update it after each verified milestone. Do not use older numbered lists or status paragraphs below as the current project status.
 
 ## 8. Repository and workflow instructions
 
@@ -130,7 +123,7 @@ Important review points before claiming completion:
 - The workspace snapshot may not have `.git`; a `git status` failure does not mean the remote repo is missing. Use the connected GitHub integration or work in a normal authenticated clone/worktree. Check the remote `main` head immediately before making a push; do not overwrite a newer commit.
 - Keep generated datasets, secrets, `.env`, and Docker volume data out of Git. Never commit access tokens/passwords. `.env.example` contains demo values only.
 - Start local stack with Docker Desktop: `docker compose up --build`; browser `http://localhost:3000`; stop with `docker compose down`. Do not run `docker compose down -v` unless the user knowingly wants the local database/event history removed.
-- Local Docker Desktop was inspected on 2026-09-30 after the user unlocked the Mac. The existing four-service stack is still running: PostgreSQL (`5432`, healthy), Kafka (`9092`, healthy), API (`8080`), and dashboard (`3000`). The updated five-service Compose stack has not started because its API image build stalls during Maven packaging. No volumes were removed; the existing services were left running. The ClickHouse image was pulled successfully, but no ClickHouse container is running.
+- Historical note (2026-09-30): a prior five-service Compose rebuild stalled during Maven packaging, leaving an older four-service runtime. This was superseded by the 2026-10-01 six-service local check described at the start of this handoff. The current task mirror has no Docker socket access, so runtime state could not be rechecked after the V6 change.
 - CI runs simulator tests and Maven/Testcontainers backend `verify`, then frontend `npm ci` and `npm run build`. A green CI run is evidence for those jobs only; it is not load/security/cloud proof.
 - When a user asks “what do I do?”, give app/window-specific directions. If they only use Codex, avoid telling them to open a terminal unless necessary.
 
@@ -218,3 +211,25 @@ At the user's 805 px browser width, the 224 px sidebar overlapped a workspace gr
 The API currently reports three demo vehicles with the same coordinates. Their old map pins occupied the same pixels and looked like one vehicle. The map now groups identical reported coordinates into one numbered marker; its popup lists each actual vehicle/status, and the adjacent list keeps the separate vehicles. Coordinates are not altered. Long IDs are visually truncated in the map list and remain available as the element title and in the vehicle table/details.
 
 At tablet widths, long synthetic UUIDs now render as a compact prefix/ellipsis/suffix with the complete ID retained in the title and CSV. The Alerts table hides estimated-fuel and last-observed columns at this width and explains that those fields remain in Export CSV; its remaining columns fit without horizontal scrolling. Browser inspection confirmed the compact alert table and an empty browser error/warning log after the UI updates.
+
+## 18. Verification and evidence refresh (2026-10-02)
+
+The following checks passed in the project checkout:
+
+- Frontend TypeScript and Vite production build: `npm run build`.
+- Simulator tests: `PYTHONPATH=src python3.12 -m unittest discover -s tests -v` (3 passed).
+- Compose syntax/config: `docker compose config --quiet`.
+- Startup-script syntax: `bash -n scripts/start_demo.sh`.
+- Browser inspection of Dashboard and Alerts: routes rendered API-backed data; browser console showed no warnings/errors.
+
+Detailed run notes: `evidences/2026-10-01/build-and-simulator-tests.md`. The host's default `python3` is 3.9; use Python 3.12 for simulator tests. Dashboard and Alerts images are now saved under `evidences/2026-10-01/`, with their timestamped counts and limits in `screenshot-capture.md`, and embedded in Section 3.1 of the solution draft. These images document the local synthetic demo and do not count as load or observability evidence. Capture a fresh set against the final release candidate if the UI changes.
+
+This project directory is a ChatGPT project mirror without `.git`. Changes made here are not automatically published; publish them through the authenticated GitHub interface or a real Git checkout, then verify the remote commit before marking publication complete. The `sources/` directory, if populated in a future mirror, remains read-only.
+
+## 19. Architecture and relational model refresh (2026-10-01)
+
+`docs/ARCHITECTURE.md` reflects the six-service local setup, ClickHouse hourly rollups, and observed local Reports/API behavior. Migration V6 now adds tenant/vehicle ownership tables, backfills them from existing data, and enforces composite foreign keys. Those changes are only in this local project mirror and have not been applied to the Mac database or verified by backend tests. Operational state/alerts remain intentional read projections; the vehicle catalog has identity fields only. `docs/adr/0003-analytical-store.md` records the ClickHouse choice and unverified scale/recovery limits. The next schema priority is to run V6 against clean and existing 100K databases and check the query plans.
+
+`backend/src/main/resources/db/migration/V6__normalize_tenant_vehicle_ownership.sql` adds tenant and tenant-scoped vehicle identity tables, backfills IDs from existing telemetry/state/alerts/fuel data, and adds composite vehicle foreign keys. `TelemetryService` registers ownership keys before dependent writes. A migration-only commit initially failed CI because the API compatibility change had not landed yet. The follow-up API fix is on GitHub `main` in commit [`97c160b`](https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/commit/97c160bf12a08605f8b74c0b54f2f3cb259df954), and CI run [`36866785103`](https://github.com/markapurammarthanda12/Fleet-Intelligence-Platform/actions/runs/36866785103) passed. A local Maven/Testcontainers run passed 10 integration tests; a disposable PostgreSQL check applied V6 to 100,000 synthetic telemetry events plus representative alert/fuel rows and confirmed the catalog and all four foreign keys. These tests do not prove the user's persistent Compose volume is migrated. Access to the local Docker socket is currently denied in this workspace, so its current migration/runtime status must be rechecked before rebuilding or claiming it is current.
+
+The current project status is maintained in [docs/PROJECT_CHECKLIST.md](PROJECT_CHECKLIST.md). This project mirror has no `.git` metadata; files edited here require a verified update to the connected GitHub repository before claiming they have been published.
