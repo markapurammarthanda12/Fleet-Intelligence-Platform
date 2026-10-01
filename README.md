@@ -17,6 +17,8 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 - An optional Python live-simulator service emits changing synthetic telemetry through the same validated API and Kafka path as other vehicle events. This is generated test data, not data from physical connected vehicles.
 - Idling alerts escalate from `warning` to `critical` after 15 minutes by default and are returned with open, critical alerts first. This is a demo policy configurable with `IDLE_CRITICAL_SECONDS`.
 - Kafka also feeds an independent ClickHouse Kafka Engine/materialized-view path for historical analytics. `GET /v1/analytics/telemetry/hourly` returns hourly event, vehicle, idling, and moving counts for a tenant and bounded time range. The dashboard Reports view uses this endpoint.
+- Fuel Management persists refuelling transactions in PostgreSQL. The local demo has a one-click simulated refuelling trigger that creates a batch proportional to 0.1% of the reporting fleet (minimum one vehicle, maximum 500), using fixed illustrative petrol/diesel prices. Monthly spend and purchased litres update from saved transactions; potential tailpipe CO₂ is clearly an estimate from the purchase volume, not a vehicle sensor measurement.
+- Analytics and Reports are separate views: Analytics shows telemetry KPIs and an hourly trend; Reports shows the underlying hourly rows and CSV export. The Fuel screen lists the recent simulated purchases and has a one-click refuelling trigger.
 
 ## Hackathon deliverables and current status
 
@@ -25,7 +27,7 @@ The Fleet Intelligence Platform turns connected-vehicle data into trustworthy, e
 | Dockerized, portable system | Compose defines Kafka, ClickHouse, PostgreSQL, API, dashboard, and an optional live-simulator profile. | Verify the latest rebuilt stack; local Kafka remains single-node |
 | Real-time ingestion and alerting | The API waits for Kafka broker acknowledgement; keyed consumer persists idempotently, retries failures, and routes exhausted retries to a dead-letter topic | Measure end-to-end latency and burst behavior at challenge scale; test dead-letter replay |
 | Relational and high-volume data | PostgreSQL holds transactional events, vehicle state, and alerts. ClickHouse schema and Kafka ingestion path are implemented for analytical history. | Verify ClickHouse consumes broker events end to end; add fleet metadata and evaluate retention/partition settings |
-| User interface | Overview, Vehicles, Alerts, and Reports read API data and have no hardcoded fallback fleet. Additional Drivers, Routes, Maintenance, and Fuel workflows are parked for later. | Verify against the loaded local dataset; add alert acknowledgement and interactive login |
+| User interface | Overview, Vehicles, Alerts, Analytics, and Reports read API data. Fuel Management records simulated refuelling batches via a one-click trigger. | Rebuild and verify the current Docker images; add alert acknowledgement and hosted interactive login |
 | Security, tests, and observability | OIDC JWT validation, scope checks, tenant claim isolation, and an integration scenario for unauthenticated/cross-tenant access; simulator tests and dashboard build run in GitHub Actions | Configure a hosted identity provider; add mTLS, TLS, audit events, masking/erasure, security scans, coverage reporting, and metrics/logs/traces |
 | Performance targets | Not measured | Load test target throughput and burst behavior; report measured latency, loss/error rate, and lag |
 
@@ -91,6 +93,8 @@ cp .env.example .env
 
 The optional `.env` copy is only needed if you want to customize settings; defaults work for local development. The API is available at `http://localhost:8080`, and readiness is at `/actuator/health/readiness`. Submit a telemetry event to `POST /v1/telemetry`, then read it back with `GET /v1/telemetry?tenant_id=tenant-00&vehicle_id=vehicle-000001`. The dashboard overview uses `GET /v1/fleet/overview?tenant_id=tenant-00`, `GET /v1/vehicles?tenant_id=tenant-00`, and `GET /v1/alerts?tenant_id=tenant-00`.
 
+The local Fuel page calls `POST /v1/fuel/simulate-refuelling?tenant_id=tenant-100k` when its trigger is pressed. The API chooses a random batch equal to 0.1% of vehicles with reported state (minimum 1; capped at 500) and persists fill records. `GET /v1/fuel/summary?tenant_id=tenant-100k` and `GET /v1/fuel/purchases?tenant_id=tenant-100k` power the live totals and recent-fill table. Demo prices are fixed assumptions, not live pump-price data.
+
 Example request:
 
 ```bash
@@ -105,7 +109,7 @@ Local Kafka stores seven days of topic data across 12 partitions. For a replay o
 
 The sample password in `.env.example` is for a local demonstration only. Use a managed secret for any shared or deployed environment. `docker compose down` stops the services; `docker compose down -v` also removes the local database volume and its data.
 
-The overview only counts vehicles that have sent telemetry; it is not a registered-vehicle inventory. A vehicle is shown as moving or idling only when an engine-on event has arrived within five minutes. Engine-off vehicles and vehicles with stale telemetry are called out separately. Coordinates are displayed as reported by the vehicle; a map/geocoding provider is not connected. Drivers, Routes & Dispatch, Maintenance, and Fuel Management have frontend previews with synthetic sample rows; these are not live fleet records. Reports provides hourly telemetry aggregates from ClickHouse, but needs runtime verification against the new Compose stack. The fuel figure is an assumption-based idling estimate, not measured savings.
+The overview only counts vehicles that have sent telemetry; it is not a registered-vehicle inventory. A vehicle is shown as moving or idling only when an engine-on event has arrived within five minutes. Engine-off vehicles and vehicles with stale telemetry are called out separately. Coordinates are displayed as reported by the vehicle; a map/geocoding provider is not connected. Drivers, Routes & Dispatch, and Maintenance remain sample-data previews. Fuel refuelling records are persisted in PostgreSQL; they are generated by a demo trigger with fixed prices and synthetic quantities. Potential CO₂ is an estimate based on fuel purchased, not directly measured tailpipe emissions. Analytics provides trend KPIs and Reports provides hourly telemetry aggregates from ClickHouse; the new screens need runtime verification against the rebuilt Compose stack. The separate fuel figure for idling alerts remains an assumption-based estimate, not measured savings.
 
 To generate the fleet again, open **Terminal** in the project folder and run:
 

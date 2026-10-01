@@ -38,6 +38,33 @@ type HourlyTelemetryPoint = {
   moving_events: number;
 };
 
+type FuelPurchase = {
+  purchase_id: string;
+  vehicle_id: string;
+  fuel_type: "petrol" | "diesel";
+  purchased_at: string;
+  litres: number;
+  price_per_litre: number;
+  total_cost: number;
+  co2_estimate_kg: number;
+};
+
+type FuelSummary = {
+  month_litres: number;
+  month_cost: number;
+  month_estimated_co2_kg: number;
+  month_purchase_count: number;
+  previous_month_cost: number;
+  cost_change_percent: number | null;
+};
+
+type FuelSimulationResult = {
+  vehicles_refuelled: number;
+  litres_added: number;
+  cost_added: number;
+  estimated_co2_added_kg: number;
+};
+
 type FleetVehicle = {
   tenant_id: string;
   vehicle_id: string;
@@ -171,6 +198,44 @@ function normalizeAnalytics(raw: Record<string, unknown>): HourlyTelemetryPoint 
   };
 }
 
+function normalizeFuelPurchase(raw: Record<string, unknown>): FuelPurchase {
+  return {
+    purchase_id: String(apiValue(raw, "purchaseId", "purchase_id") ?? ""),
+    vehicle_id: String(apiValue(raw, "vehicleId", "vehicle_id") ?? ""),
+    fuel_type: String(apiValue(raw, "fuelType", "fuel_type") ?? "petrol") as FuelPurchase["fuel_type"],
+    purchased_at: String(apiValue(raw, "purchasedAt", "purchased_at") ?? ""),
+    litres: Number(raw.litres ?? 0),
+    price_per_litre: Number(apiValue(raw, "pricePerLitre", "price_per_litre") ?? 0),
+    total_cost: Number(apiValue(raw, "totalCost", "total_cost") ?? 0),
+    co2_estimate_kg: Number(apiValue(raw, "co2EstimateKg", "co2_estimate_kg") ?? 0),
+  };
+}
+
+function normalizeFuelSummary(raw: Record<string, unknown>): FuelSummary {
+  const change = apiValue(raw, "costChangePercent", "cost_change_percent");
+  return {
+    month_litres: Number(apiValue(raw, "monthLitres", "month_litres") ?? 0),
+    month_cost: Number(apiValue(raw, "monthCost", "month_cost") ?? 0),
+    month_estimated_co2_kg: Number(apiValue(raw, "monthEstimatedCo2Kg", "month_estimated_co2_kg") ?? 0),
+    month_purchase_count: Number(apiValue(raw, "monthPurchaseCount", "month_purchase_count") ?? 0),
+    previous_month_cost: Number(apiValue(raw, "previousMonthCost", "previous_month_cost") ?? 0),
+    cost_change_percent: change === null || change === undefined ? null : Number(change),
+  };
+}
+
+function normalizeFuelSimulation(raw: Record<string, unknown>): FuelSimulationResult {
+  return {
+    vehicles_refuelled: Number(apiValue(raw, "vehiclesRefuelled", "vehicles_refuelled") ?? 0),
+    litres_added: Number(apiValue(raw, "litresAdded", "litres_added") ?? 0),
+    cost_added: Number(apiValue(raw, "costAdded", "cost_added") ?? 0),
+    estimated_co2_added_kg: Number(apiValue(raw, "estimatedCo2AddedKg", "estimated_co2_added_kg") ?? 0),
+  };
+}
+
+function formatRupees(amount: number) {
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
+}
+
 function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number>>) {
   const csv = [headers, ...rows].map((row) => row.map((cell) => {
     const value = String(cell);
@@ -203,6 +268,12 @@ export default function App() {
   const [analytics, setAnalytics] = useState<HourlyTelemetryPoint[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState("");
+  const [fuelSummary, setFuelSummary] = useState<FuelSummary | null>(null);
+  const [fuelPurchases, setFuelPurchases] = useState<FuelPurchase[]>([]);
+  const [fuelLoading, setFuelLoading] = useState(true);
+  const [fuelError, setFuelError] = useState("");
+  const [fuelTriggering, setFuelTriggering] = useState(false);
+  const [fuelNotice, setFuelNotice] = useState("");
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [vehicleHistory, setVehicleHistory] = useState<VehicleTelemetry[]>([]);
   const [vehicleHistoryLoading, setVehicleHistoryLoading] = useState(false);
@@ -251,6 +322,28 @@ export default function App() {
     }
   }, []);
 
+  const refreshFuel = useCallback(async () => {
+    try {
+      const query = new URLSearchParams({ tenant_id: DEMO_TENANT_ID });
+      const [summaryResponse, purchasesResponse] = await Promise.all([
+        fetch(`/api/v1/fuel/summary?${query}`, { headers: { Accept: "application/json" } }),
+        fetch(`/api/v1/fuel/purchases?${query}&limit=100`, { headers: { Accept: "application/json" } }),
+      ]);
+      if (!summaryResponse.ok || !purchasesResponse.ok) throw new Error("Fuel activity is unavailable. Rebuild the API image to enable fuel simulation.");
+      const [summary, purchases] = await Promise.all([
+        summaryResponse.json() as Promise<Record<string, unknown>>,
+        purchasesResponse.json() as Promise<Array<Record<string, unknown>>>,
+      ]);
+      setFuelSummary(normalizeFuelSummary(summary));
+      setFuelPurchases(purchases.map(normalizeFuelPurchase));
+      setFuelError("");
+    } catch (cause) {
+      setFuelError(cause instanceof Error ? cause.message : "Fuel activity is unavailable.");
+    } finally {
+      setFuelLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!demoSignedIn) return;
     void refresh();
@@ -258,6 +351,14 @@ export default function App() {
     const timer = window.setInterval(() => void refresh(), 5000);
     return () => window.clearInterval(timer);
   }, [demoSignedIn, refresh, settings.realTimeAlerts]);
+
+  useEffect(() => {
+    if (!demoSignedIn) return;
+    void refreshFuel();
+    if (!settings.realTimeAlerts) return;
+    const timer = window.setInterval(() => void refreshFuel(), 5000);
+    return () => window.clearInterval(timer);
+  }, [demoSignedIn, refreshFuel, settings.realTimeAlerts]);
 
   useEffect(() => {
     const syncSection = () => setActiveSection(window.location.hash.slice(1) || "overview");
@@ -398,12 +499,30 @@ export default function App() {
     alerts: { title: "Alerts & decisions", subtitle: "Review operational alerts and the signals that need attention." },
     analytics: { title: "Analytics", subtitle: "Explore fleet activity and trends across the selected period." },
     reports: { title: "Reports", subtitle: "Download reports based on retained fleet telemetry." },
+    fuel: { title: "Fuel management", subtitle: "Track simulated fleet refuelling, spend, and estimated emissions." },
     decisions: { title: "Decision engine", subtitle: "Review the rules that turn vehicle events into operator alerts." },
     settings: { title: "Settings", subtitle: "Configure local demo preferences for this browser." },
   };
   const page = sectionMeta[activeSection] ?? sectionMeta.overview;
   const updateRules = (next: DemoRule[]) => { setRules(next); localStorage.setItem("fleet-demo-rules", JSON.stringify(next)); };
   const updateSetting = <K extends keyof DemoSettings>(key: K, value: DemoSettings[K]) => { setSettings((current) => ({ ...current, [key]: value })); setSettingsSaved(false); };
+  const triggerFuelSimulation = async () => {
+    setFuelTriggering(true);
+    setFuelNotice("");
+    try {
+      const query = new URLSearchParams({ tenant_id: DEMO_TENANT_ID });
+      const response = await fetch(`/api/v1/fuel/simulate-refuelling?${query}`, { method: "POST", headers: { Accept: "application/json" } });
+      const result = await response.json() as Record<string, unknown>;
+      if (!response.ok) throw new Error(String(result.detail ?? result.message ?? "Could not trigger simulated refuelling."));
+      const event = normalizeFuelSimulation(result);
+      setFuelNotice(`Recorded refuelling for ${event.vehicles_refuelled} vehicles · ${formatRupees(event.cost_added)} added to this month’s fleet spend.`);
+      await refreshFuel();
+    } catch (cause) {
+      setFuelError(cause instanceof Error ? cause.message : "Could not trigger simulated refuelling.");
+    } finally {
+      setFuelTriggering(false);
+    }
+  };
 
   if (!demoSignedIn) return (
     <main className="login-page">
@@ -439,6 +558,7 @@ export default function App() {
           <a className={`nav-item${activeSection === "alerts" ? " selected" : ""}`} href="#alerts"><span>♧</span>Alerts</a>
           <a className={`nav-item${activeSection === "analytics" ? " selected" : ""}`} href="#analytics"><span>▥</span>Analytics</a>
           <a className={`nav-item${activeSection === "vehicles" ? " selected" : ""}`} href="#vehicles"><span>▣</span>Vehicles <small>{overview.vehicles_seen}</small></a>
+          <a className={`nav-item${activeSection === "fuel" ? " selected" : ""}`} href="#fuel"><span>◉</span>Fuel</a>
           <a className={`nav-item${activeSection === "reports" ? " selected" : ""}`} href="#reports"><span>▤</span>Reports</a>
           <a className={`nav-item${activeSection === "settings" ? " selected" : ""}`} href="#settings"><span>⚙</span>Settings</a>
         </nav>
@@ -494,6 +614,7 @@ export default function App() {
             <article className="metric-card panel"><div className="metric-top"><span>Moving now</span><span className="metric-icon green">↗</span></div><strong>{loading ? "—" : overview.moving_now.toLocaleString()}</strong><small>Latest signal within 5 minutes</small></article>
             <article className="metric-card panel"><div className="metric-top"><span>Idling now</span><span className="metric-icon orange">Ⅱ</span></div><strong>{loading ? "—" : overview.idling_now.toLocaleString()}</strong><small>Engine on · stationary</small></article>
             <article className="metric-card panel"><div className="metric-top"><span>Open alerts</span><span className="metric-icon red">!</span></div><strong>{loading ? "—" : overview.open_alerts.toLocaleString()}</strong><small>Require fleet operator attention</small></article>
+            <article className="metric-card panel"><div className="metric-top"><span>Fuel spend · this month</span><span className="metric-icon orange">₹</span></div><strong>{fuelLoading || fuelError ? "—" : formatRupees(fuelSummary?.month_cost ?? 0)}</strong><small>{fuelSummary?.month_purchase_count ?? 0} simulated fuel stops</small></article>
           </section>
 
           <section className="overview-charts" aria-label="Fleet health summary">
@@ -578,6 +699,50 @@ export default function App() {
               </tbody></table></div>
             )}
             <footer className="table-footer"><span>Showing {visibleAlerts.length} of {alerts.length} alerts loaded</span><span>Alerts are rule-based explanations; estimated fuel uses the documented demo assumption.</span><span className="compact-table-note">Fuel and time details are available in Export CSV.</span></footer>
+          </section>
+
+          <section className="analytics-screen panel" id="analytics-dashboard">
+            <div className="section-heading reports-heading">
+              <div><div className="section-title-row"><h2>Fleet activity</h2><span className="count-pill">Live history</span></div><p>Hourly vehicle signals from the selected reporting period.</p></div>
+            </div>
+            <div className="fuel-kpi-grid analytics-kpi-grid">
+              <article className="metric-card panel"><div className="metric-top"><span>Telemetry events</span><span className="metric-icon blue">↗</span></div><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.events.toLocaleString()}</strong><small>Unique received events</small></article>
+              <article className="metric-card panel"><div className="metric-top"><span>Peak vehicles / hour</span><span className="metric-icon green">▣</span></div><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.vehicles.toLocaleString()}</strong><small>Most active hourly bucket</small></article>
+              <article className="metric-card panel"><div className="metric-top"><span>Idling events</span><span className="metric-icon orange">Ⅱ</span></div><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.idling.toLocaleString()}</strong><small>Engine on · speed ≤ 0.5 km/h</small></article>
+              <article className="metric-card panel"><div className="metric-top"><span>Moving events</span><span className="metric-icon green">➜</span></div><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.moving.toLocaleString()}</strong><small>Engine on · speed above 0.5 km/h</small></article>
+            </div>
+            <article className="chart-card panel analytics-chart-card">
+              <div className="chart-card-heading"><div><h2>Fleet activity trend</h2><p>Hourly counts · use Reports to download the underlying rows</p></div><span className="chart-chip">Live query</span></div>
+              {analyticsLoading ? <div className="empty-state"><span className="loading-ring" />Loading fleet activity…</div> : analyticsError ? <div className="empty-state"><strong>Analytics unavailable</strong><span>{analyticsError}</span></div> : analytics.length === 0 ? <div className="empty-state"><strong>No events in this period</strong><span>New telemetry will appear here when it is received.</span></div> : <>
+                <div className="line-chart-wrap"><div className="chart-y-labels"><span>{chartMax.toLocaleString()}</span><span>{Math.round(chartMax / 2).toLocaleString()}</span><span>0</span></div><svg className="fleet-line-chart" viewBox="0 0 700 180" role="img" aria-label="Hourly moving and idling telemetry events"><path className="chart-gridline" d="M36 22H676 M36 85H676 M36 150H676"/><polyline className="event-line" points={eventTrendPath}/><polyline className="idle-line" points={idleTrendPath}/></svg></div>
+                <div className="chart-x-labels"><span>{new Date(analytics[0].bucket_start_epoch_ms).toLocaleString()}</span><span>{new Date(analytics.at(-1)!.bucket_start_epoch_ms).toLocaleString()}</span></div>
+                <div className="chart-legend"><span><i className="legend-blue" />Unique events</span><span><i className="legend-orange" />Idling events</span></div>
+              </>}
+            </article>
+            <div className="table-footer"><span>Analytics refresh with the live dashboard.</span><span>Events are grouped by hour in UTC.</span></div>
+          </section>
+
+          <section className="fuel-screen panel" id="fuel-content">
+            <div className="section-heading reports-heading">
+              <div><div className="section-title-row"><h2>Fuel activity</h2><span className="count-pill">Simulated live</span></div><p>Trigger one refuelling batch to see fleet spend and fuel totals update in real time.</p></div>
+              <button className="primary-button fuel-trigger-button" type="button" disabled={fuelTriggering || fuelLoading || Boolean(fuelError)} onClick={() => void triggerFuelSimulation()}>
+                {fuelTriggering ? "Recording refuelling…" : "⛽ Trigger refuelling"}
+              </button>
+            </div>
+            {fuelError && <div className="notice error" role="alert">{fuelError}</div>}
+            {fuelNotice && <div className="notice fuel-success" role="status">{fuelNotice}</div>}
+            <div className="fuel-kpi-grid">
+              <article className="metric-card panel"><div className="metric-top"><span>Fuel spend · this month</span><span className="metric-icon orange">₹</span></div><strong>{fuelLoading || fuelError ? "—" : formatRupees(fuelSummary?.month_cost ?? 0)}</strong><small>{fuelSummary?.month_purchase_count ?? 0} fill-ups recorded</small></article>
+              <article className="metric-card panel"><div className="metric-top"><span>Fuel purchased</span><span className="metric-icon blue">⛽</span></div><strong>{fuelLoading || fuelError ? "—" : `${(fuelSummary?.month_litres ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} L`}</strong><small>Current month total</small></article>
+              <article className="metric-card panel"><div className="metric-top"><span>Potential CO₂</span><span className="metric-icon green">◌</span></div><strong>{fuelLoading || fuelError ? "—" : `${(fuelSummary?.month_estimated_co2_kg ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}</strong><small>Estimated from fuel purchased</small></article>
+              <article className="metric-card panel"><div className="metric-top"><span>Spend vs previous month</span><span className="metric-icon violet">%</span></div><strong>{fuelLoading || fuelError || fuelSummary?.cost_change_percent === null ? "—" : `${fuelSummary!.cost_change_percent! > 0 ? "+" : ""}${fuelSummary!.cost_change_percent!.toFixed(1)}%`}</strong><small>{fuelSummary?.previous_month_cost ? `Previous: ${formatRupees(fuelSummary.previous_month_cost)}` : "No previous-month baseline"}</small></article>
+            </div>
+            <div className="fuel-demo-note"><strong>Demo assumptions:</strong> one trigger refuels 0.1% of the fleet (minimum one vehicle, maximum 500). Each fill adds a realistic random quantity; per-litre prices use fixed Bengaluru-style demo assumptions (petrol ₹104.75, diesel ₹91.50), not live pump prices. CO₂ is an estimate based on purchased litres, not a vehicle emissions sensor.</div>
+            <div className="section-heading fuel-table-heading"><div><div className="section-title-row"><h2>Recent refuelling</h2><span className="count-pill">{fuelPurchases.length}</span></div><p>Latest simulated fuel purchases for this fleet.</p></div><button className="export-button" type="button" disabled={fuelPurchases.length === 0} onClick={() => downloadCsv("fleet-fuel-purchases.csv", ["Purchased at", "Vehicle ID", "Fuel", "Litres", "Price per litre INR", "Total cost INR", "Potential CO2 kg"], fuelPurchases.map((purchase) => [purchase.purchased_at, purchase.vehicle_id, purchase.fuel_type, purchase.litres, purchase.price_per_litre, purchase.total_cost, purchase.co2_estimate_kg]))}>Export CSV</button></div>
+            {fuelLoading ? <div className="empty-state"><span className="loading-ring" />Loading fuel records…</div> : fuelPurchases.length === 0 ? <div className="empty-state"><strong>No fuel records yet</strong><span>Trigger refuelling to create the first synthetic batch.</span></div> : <div className="table-wrap"><table><thead><tr><th>Time</th><th>Vehicle</th><th>Fuel</th><th>Litres</th><th>Price / litre</th><th>Cost</th><th>Potential CO₂</th></tr></thead><tbody>
+              {fuelPurchases.slice(0, 20).map((purchase) => <tr key={purchase.purchase_id}><td>{formatDate(purchase.purchased_at)}</td><td className="vehicle-id">{displayVehicleId(purchase.vehicle_id)}</td><td><span className="fuel-type-pill">{purchase.fuel_type}</span></td><td>{purchase.litres.toFixed(1)} L</td><td>{formatRupees(purchase.price_per_litre)}</td><td className="fuel-value">{formatRupees(purchase.total_cost)}</td><td>{purchase.co2_estimate_kg.toFixed(1)} kg</td></tr>)}
+            </tbody></table></div>}
+            <div className="table-footer"><span>Fuel purchases are persistent in PostgreSQL.</span><span>Totals refresh automatically every 5 seconds.</span></div>
           </section>
 
           <section className="reports-section panel" id="reports">
