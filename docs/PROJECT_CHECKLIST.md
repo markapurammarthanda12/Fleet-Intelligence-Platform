@@ -1,5 +1,8 @@
 ## Current update — 2026-10-01
 
+- [x] Created eight editable architecture/data diagrams in [tldraw](https://www.tldraw.com/f/xqQin5G17zVwYYik65jLI): context, containers, event flow, ER/ownership, deployment, layers, and two sequences. Current vs planned components and unmeasured latency are labeled clearly. See [diagram index](DIAGRAMS.md) and landscape Appendix A in the solution draft.
+- [x] Updated the solution document working draft with the diagrams in a landscape appendix and visually reviewed all pages. Team, video, screenshots, performance/security evidence, and final declarations remain placeholders.
+
 - [x] Factual solution document working draft created from the supplied template and visually reviewed after rendering. It includes explicit placeholders for unmeasured results, screenshots, diagrams, team details, video, and final declarations: [DOCX draft](Fleet_Intelligence_Solution_Document_DRAFT.docx). This is not yet submission-ready; complete the placeholders and final export/review.
 
 - [x] Persistent local database migrated to V6; API readiness and Dashboard, Alerts, Analytics, Reports verified with live synthetic data. See [runtime evidence](../evidences/2026-10-01/local-stack-check.md).
@@ -36,7 +39,7 @@
 - [ ] **Save evidence screenshots.** Dashboard and Alerts were visually inspected on 2026-10-01, and placeholder guides reserve the target filenames in `evidences/2026-10-01/`. The actual `dashboard-overview.jpg` and `alerts.jpg` files still need to be captured from the release candidate and recorded with commit/runtime details; placeholders are not evidence.
 - [ ] **Verify the clean-clone, one-command demo.** Exercise `bash scripts/start_demo.sh` from a clean checkout/empty disposable database and document expected endpoints. It was not run against the persistent database; a separate empty stack would duplicate PostgreSQL, Kafka, ClickHouse, and the 100K seed load on this machine. Keep the persistent volume untouched.
 - [ ] **Refresh handoff, README, and evidence status.** README and handoff point to this checklist and the requirements matrix, and the CI fix is linked. Refresh the evidence index and current runtime note to include the V6 verification above. Keep the local-project mirror and GitHub state clearly distinguished.
-- [ ] **Finalize the solution document.** A template-based factual DOCX draft is now linked at [Fleet_Intelligence_Solution_Document_DRAFT.docx](Fleet_Intelligence_Solution_Document_DRAFT.docx) and rendered for visual review. It deliberately marks performance/security figures unverified and retains placeholders for screenshots, diagrams, team/video details, and other missing evidence. Complete those items and export/review the final submission PDF.
+- [ ] **Finalize the solution document.** The factual template-based DOCX draft now includes the architecture diagrams in landscape Appendix A. It is rendered and visually reviewed. Performance/security figures remain unverified, and placeholders remain for screenshots, team/video details, final declarations, and other missing evidence. Complete those items and export/review the final submission PDF.
 
 ### P1 — Demonstrate correctness, speed, security, and recovery
 
@@ -48,7 +51,7 @@
 
 ### P2 — Deployment and final submission
 
-- [ ] **Create a C4 architecture set** (context, container, and relevant component view) consistent with the code and deployment model.
+- [x] **Create the architecture diagram set.** Editable tldraw board and exported landscape Appendix A include C4 context and container, event flow, post-V6 ER/ownership, current-vs-target deployment, service layers, and two sequence diagrams. Planned HA and latency targets are labeled as unimplemented/unmeasured. See [diagram index](DIAGRAMS.md).
 - [ ] **Prove deployment and availability.** Add infrastructure/deployment configuration for a selected cloud or a credible cloud-agnostic target, remove single points of failure for the demonstrated topology, and measure recovery/availability. Credentials or provider setup may require the user.
 - [ ] **Complete simulator scenarios.** Add reproducible bursts, duplicates, out-of-order events, faults/trips, and documented volume presets without committing large generated datasets.
 - [ ] **Finalize 3–5 ADRs** with alternatives and trade-offs; ensure relational, stream, and analytical storage choices are justified against the requirements.
