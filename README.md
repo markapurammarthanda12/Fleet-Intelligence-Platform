@@ -178,3 +178,7 @@ The latest backend optimization is commit `51192e36d674e890fedc360ac263bccc612b0
 See [the project brief](docs/PROJECT_BRIEF.md) and [architecture notes](docs/ARCHITECTURE.md).
 
 For a complete continuation brief—including the challenge acceptance criteria, prior decisions, verified state, known gaps, and next steps for a new agent—read [the agent handoff guide](docs/AGENT_HANDOFF.md).
+
+
+## Current task list
+See [the prioritized project checklist](docs/PROJECT_CHECKLIST.md) for work marked complete and remaining items. The [requirements evidence matrix](docs/REQUIREMENTS_MATRIX.md) distinguishes implemented features from hackathon targets that still need proof.
