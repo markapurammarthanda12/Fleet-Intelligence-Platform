@@ -13,5 +13,7 @@ public record AlertRecord(
         long idleSeconds,
         double estimatedFuelLitres,
         String status,
-        Instant resolvedAt) {
+        Instant resolvedAt,
+        Instant acknowledgedAt,
+        String acknowledgedBy) {
 }

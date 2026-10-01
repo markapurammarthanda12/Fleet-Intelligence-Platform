@@ -5,6 +5,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -83,7 +85,7 @@ public class TelemetryService {
         return jdbcTemplate.query("""
                 SELECT alert_id, tenant_id, vehicle_id, rule_version, severity,
                        episode_started_at, last_observed_at, idle_seconds,
-                       estimated_fuel_litres, status, resolved_at
+                       estimated_fuel_litres, status, resolved_at, acknowledged_at, acknowledged_by
                 FROM fleet_alerts
                 WHERE tenant_id = ?
                 ORDER BY CASE WHEN status = 'open' THEN 0 ELSE 1 END,
@@ -94,6 +96,29 @@ public class TelemetryService {
                 alertRowMapper(),
                 tenantId,
                 Math.max(1, Math.min(limit, 500)));
+    }
+
+    @Transactional
+    public AlertRecord acknowledgeAlert(String tenantId, String alertId) {
+        int updated = jdbcTemplate.update("""
+                UPDATE fleet_alerts
+                SET status = 'acknowledged', acknowledged_at = now(), acknowledged_by = 'demo-operator'
+                WHERE tenant_id = ? AND alert_id = ? AND status = 'open'
+                """, tenantId, alertId);
+        if (updated == 0) {
+            Integer exists = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM fleet_alerts WHERE tenant_id = ? AND alert_id = ?",
+                    Integer.class, tenantId, alertId);
+            if (exists == null || exists == 0) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Alert not found for this fleet");
+            }
+        }
+        return jdbcTemplate.queryForObject("""
+                SELECT alert_id, tenant_id, vehicle_id, rule_version, severity,
+                       episode_started_at, last_observed_at, idle_seconds,
+                       estimated_fuel_litres, status, resolved_at, acknowledged_at, acknowledged_by
+                FROM fleet_alerts WHERE tenant_id = ? AND alert_id = ?
+                """, alertRowMapper(), tenantId, alertId);
     }
 
     public FleetOverviewRecord overview(String tenantId) {
@@ -204,7 +229,7 @@ public class TelemetryService {
                     UPDATE fleet_alerts
                     SET status = 'resolved', resolved_at = ?
                     WHERE tenant_id = ? AND vehicle_id = ?
-                      AND status = 'open' AND rule_version = 'idle-v1'
+                      AND status IN ('open', 'acknowledged') AND rule_version = 'idle-v1'
                     """,
                     Timestamp.from(event.observedAt()), event.tenantId(), event.vehicleId());
         }
@@ -273,7 +298,10 @@ public class TelemetryService {
                 result.getDouble("estimated_fuel_litres"),
                 result.getString("status"),
                 result.getTimestamp("resolved_at") == null
-                        ? null : result.getTimestamp("resolved_at").toInstant());
+                        ? null : result.getTimestamp("resolved_at").toInstant(),
+                result.getTimestamp("acknowledged_at") == null
+                        ? null : result.getTimestamp("acknowledged_at").toInstant(),
+                result.getString("acknowledged_by"));
     }
 
     private record VehicleState(Instant lastObservedAt, Instant stationarySince, boolean alertOpen) {

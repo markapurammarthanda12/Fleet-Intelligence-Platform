@@ -15,7 +15,7 @@ type FleetAlert = {
   last_observed_at: string;
   idle_seconds: number;
   estimated_fuel_litres: number;
-  status: "open" | "resolved" | string;
+  status: "open" | "acknowledged" | "resolved" | string;
   resolved_at: string | null;
 };
 
@@ -259,6 +259,8 @@ export default function App() {
   const [alertSearch, setAlertSearch] = useState("");
   const [alertSeverityFilter, setAlertSeverityFilter] = useState("all");
   const [alertStatusFilter, setAlertStatusFilter] = useState("all");
+  const [acknowledgingAlertId, setAcknowledgingAlertId] = useState<string | null>(null);
+  const [alertActionError, setAlertActionError] = useState("");
   const [overview, setOverview] = useState<FleetOverview>(emptyOverview);
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [alerts, setAlerts] = useState<FleetAlert[]>([]);
@@ -321,6 +323,25 @@ export default function App() {
       setLoading(false);
     }
   }, []);
+
+  const acknowledgeAlert = useCallback(async (alertId: string) => {
+    setAcknowledgingAlertId(alertId);
+    setAlertActionError("");
+    try {
+      const response = await fetch(`/api/v1/alerts/${encodeURIComponent(alertId)}/acknowledge?tenant_id=${encodeURIComponent(DEMO_TENANT_ID)}`, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(`Could not acknowledge this alert (HTTP ${response.status}).`);
+      const updated = normalizeAlert(await response.json() as Record<string, unknown>);
+      setAlerts((current) => current.map((alert) => alert.alert_id === alertId ? updated : alert));
+      await refresh();
+    } catch (cause) {
+      setAlertActionError(cause instanceof Error ? cause.message : "Could not acknowledge this alert.");
+    } finally {
+      setAcknowledgingAlertId(null);
+    }
+  }, [refresh]);
 
   const refreshFuel = useCallback(async () => {
     try {
@@ -692,15 +713,15 @@ export default function App() {
               <div className="alert-filters">
                 <label><span className="sr-only">Search alerts by vehicle or alert ID</span><input value={alertSearch} onChange={(event) => setAlertSearch(event.target.value)} placeholder="Search vehicle or alert ID" /></label>
                 <label><span className="sr-only">Filter alerts by severity</span><select value={alertSeverityFilter} onChange={(event) => setAlertSeverityFilter(event.target.value)}><option value="all">All severities</option><option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Info</option></select></label>
-                <label><span className="sr-only">Filter alerts by status</span><select value={alertStatusFilter} onChange={(event) => setAlertStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="open">Open</option><option value="resolved">Resolved</option></select></label>
+                <label><span className="sr-only">Filter alerts by status</span><select value={alertStatusFilter} onChange={(event) => setAlertStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="open">Open</option><option value="acknowledged">Acknowledged</option><option value="resolved">Resolved</option></select></label>
                 <button className="export-button" type="button" disabled={loading || Boolean(error) || visibleAlerts.length === 0} onClick={() => downloadCsv("fleet-alerts.csv", ["Alert ID", "Vehicle ID", "Rule", "Severity", "Status", "Episode started", "Last observed", "Idle seconds", "Estimated fuel litres"], visibleAlerts.map((alert) => [alert.alert_id, alert.vehicle_id, alert.rule_version, alert.severity, alert.status, alert.episode_started_at, alert.last_observed_at, alert.idle_seconds, alert.estimated_fuel_litres]))}>Export CSV</button>
               </div>
             </div>
             {loading ? <div className="empty-state"><span className="loading-ring" />Loading fleet alerts…</div> : error ? <div className="empty-state"><strong>Alerts are unavailable</strong><span>Check the API connection and refresh the fleet data.</span></div> : visibleAlerts.length === 0 ? (
               <div className="empty-state"><strong>{alerts.length ? "No alerts match these filters" : "No alerts for this fleet"}</strong><span>{alerts.length ? "Try a different vehicle, severity, or status." : "New operational alerts will appear here when the fleet reports them."}</span></div>
             ) : (
-              <div className="table-wrap"><table><thead><tr><th>Alert</th><th>Vehicle</th><th>Severity</th><th>Status</th><th>Idle duration</th><th>Estimated fuel</th><th>Last observed</th></tr></thead><tbody>
-                {visibleAlerts.map((alert) => <tr key={alert.alert_id}><td><span className="vehicle-id">Prolonged idling</span><small className="rule">Rule {alert.rule_version}</small></td><td title={alert.vehicle_id}>{displayVehicleId(alert.vehicle_id)}</td><td><span className={`badge badge-${alert.severity}`}><span />{alert.severity}</span></td><td><span className={`alert-status status-${alert.status}`}>{alert.status}</span></td><td>{formatDuration(alert.idle_seconds)}</td><td>{alert.estimated_fuel_litres.toFixed(2)} L</td><td>{formatDate(alert.last_observed_at)}</td></tr>)}
+              <div className="table-wrap"><table><thead><tr><th>Alert</th><th>Vehicle</th><th>Severity</th><th>Status</th><th>Idle duration</th><th>Estimated fuel</th><th>Last observed</th><th>Action</th></tr></thead><tbody>
+                {visibleAlerts.map((alert) => <tr key={alert.alert_id}><td><span className="vehicle-id">Prolonged idling</span><small className="rule">Rule {alert.rule_version}</small></td><td title={alert.vehicle_id}>{displayVehicleId(alert.vehicle_id)}</td><td><span className={`badge badge-${alert.severity}`}><span />{alert.severity}</span></td><td><span className={`alert-status status-${alert.status}`}>{alert.status}</span></td><td>{formatDuration(alert.idle_seconds)}</td><td>{alert.estimated_fuel_litres.toFixed(2)} L</td><td>{formatDate(alert.last_observed_at)}</td><td>{alert.status === "open" ? <button className="export-button" type="button" disabled={acknowledgingAlertId === alert.alert_id} onClick={() => void acknowledgeAlert(alert.alert_id)}>{acknowledgingAlertId === alert.alert_id ? "Saving…" : "Acknowledge"}</button> : "—"}</td></tr>)}
               </tbody></table></div>
             )}
             <footer className="table-footer"><span>Showing {visibleAlerts.length} of {alerts.length} alerts loaded</span><span>Alerts are rule-based explanations; estimated fuel uses the documented demo assumption.</span><span className="compact-table-note">Fuel and time details are available in Export CSV.</span></footer>
@@ -710,6 +731,7 @@ export default function App() {
             <div className="section-heading reports-heading">
               <div><div className="section-title-row"><h2>Fleet activity</h2><span className="count-pill">Live history</span></div><p>Hourly vehicle signals from the selected reporting period.</p></div>
             </div>
+            {alertActionError && <p className="form-error" role="alert">{alertActionError}</p>}
             <div className="fuel-kpi-grid analytics-kpi-grid">
               <article className="metric-card panel"><div className="metric-top"><span>Telemetry events</span><span className="metric-icon blue">↗</span></div><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.events.toLocaleString()}</strong><small>Unique received events</small></article>
               <article className="metric-card panel"><div className="metric-top"><span>Peak vehicles / hour</span><span className="metric-icon green">▣</span></div><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.vehicles.toLocaleString()}</strong><small>Most active hourly bucket</small></article>
