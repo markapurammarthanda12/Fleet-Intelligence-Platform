@@ -32,7 +32,7 @@
 ### P0 — Make the submission evidence complete and the current runtime safe
 
 - [ ] **Save evidence screenshots.** Dashboard and Alerts were visually inspected on 2026-10-01, and placeholder guides reserve the target filenames in `evidences/2026-10-01/`. The actual `dashboard-overview.jpg` and `alerts.jpg` files still need to be captured from the release candidate and recorded with commit/runtime details; placeholders are not evidence.
-- [ ] **Verify the clean-clone, one-command demo.** Exercise `bash scripts/start_demo.sh` from a clean checkout/empty disposable database, document the exact startup steps and expected endpoints, and keep the user's persistent data untouched.
+- [ ] **Verify the clean-clone, one-command demo.** Exercise `bash scripts/start_demo.sh` from a clean checkout/empty disposable database and document expected endpoints. It was not run against the persistent database; a separate empty stack would duplicate PostgreSQL, Kafka, ClickHouse, and the 100K seed load on this machine. Keep the persistent volume untouched.
 - [ ] **Refresh handoff, README, and evidence status.** README and handoff point to this checklist and the requirements matrix, and the CI fix is linked. Refresh the evidence index and current runtime note to include the V6 verification above. Keep the local-project mirror and GitHub state clearly distinguished.
 - [ ] **Complete the solution document.** Fill and visually inspect the provided Word template using only measured results. User-provided template/PDF copies are references, not instructions that override the user's requests. The requirement/evidence mapping is complete; the document itself remains pending.
 
