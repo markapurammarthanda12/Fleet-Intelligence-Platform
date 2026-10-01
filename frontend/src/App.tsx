@@ -25,6 +25,9 @@ type FleetOverview = {
   idling_now: number;
   inactive_now: number;
   offline: number;
+  healthy_vehicles: number;
+  warning_vehicles: number;
+  critical_vehicles: number;
   open_alerts: number;
   estimated_idle_fuel_litres: number;
   latest_event_at: string | null;
@@ -76,6 +79,12 @@ type FleetVehicle = {
   open_alert_count: number;
 };
 
+function vehicleHealth(vehicle: FleetVehicle, alerts: FleetAlert[]) {
+  if (alerts.some((alert) => alert.vehicle_id === vehicle.vehicle_id && alert.status === "open" && alert.severity === "critical")) return "critical";
+  if (vehicle.status === "offline" || alerts.some((alert) => alert.vehicle_id === vehicle.vehicle_id && alert.status === "open" && alert.severity === "warning")) return "warning";
+  return "healthy";
+}
+
 type VehicleTelemetry = {
   eventId: string;
   observedAt: string;
@@ -102,6 +111,9 @@ const emptyOverview: FleetOverview = {
   idling_now: 0,
   inactive_now: 0,
   offline: 0,
+  healthy_vehicles: 0,
+  warning_vehicles: 0,
+  critical_vehicles: 0,
   open_alerts: 0,
   estimated_idle_fuel_litres: 0,
   latest_event_at: null,
@@ -123,6 +135,8 @@ function formatCoordinate(latitude: number, longitude: number) {
 }
 
 function displayVehicleId(value: string) {
+  const numberedId = value.match(/^vehicle-0*(\d+)$/i);
+  if (numberedId) return `VH-${numberedId[1]}`;
   return value.length > 20 ? `${value.slice(0, 12)}…${value.slice(-6)}` : value;
 }
 
@@ -162,6 +176,9 @@ function normalizeOverview(raw: Record<string, unknown>): FleetOverview {
     idling_now: Number(apiValue(raw, "idlingNow", "idling_now") ?? 0),
     inactive_now: Number(apiValue(raw, "inactiveNow", "inactive_now") ?? 0),
     offline: Number(raw.offline ?? 0),
+    healthy_vehicles: Number(apiValue(raw, "healthyVehicles", "healthy_vehicles") ?? 0),
+    warning_vehicles: Number(apiValue(raw, "warningVehicles", "warning_vehicles") ?? 0),
+    critical_vehicles: Number(apiValue(raw, "criticalVehicles", "critical_vehicles") ?? 0),
     open_alerts: Number(apiValue(raw, "openAlerts", "open_alerts") ?? 0),
     estimated_idle_fuel_litres: Number(apiValue(raw, "estimatedIdleFuelLitres", "estimated_idle_fuel_litres") ?? 0),
     latest_event_at: (apiValue(raw, "latestEventAt", "latest_event_at") as string | null) ?? null,
@@ -277,6 +294,7 @@ export default function App() {
   const [vehicleFilter, setVehicleFilter] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [healthFilter, setHealthFilter] = useState("all");
   const [alertSearch, setAlertSearch] = useState("");
   const [alertSeverityFilter, setAlertSeverityFilter] = useState("all");
   const [alertStatusFilter, setAlertStatusFilter] = useState("all");
@@ -511,20 +529,27 @@ export default function App() {
     idling: totals.idling + row.idling_events,
     moving: totals.moving + row.moving_events,
   }), { events: 0, vehicles: 0, idling: 0, moving: 0 }), [analytics]);
+  const estimatedDistanceKm = analyticsTotals.moving * 45 / 3600;
+  const estimatedFuelLitres = estimatedDistanceKm / 10;
+  const estimatedCo2Tonnes = estimatedFuelLitres * 2.68 / 1000;
+  const utilizationPercent = analyticsTotals.moving + analyticsTotals.idling > 0
+    ? analyticsTotals.moving / (analyticsTotals.moving + analyticsTotals.idling) * 100
+    : 0;
 
   const visibleVehicles = useMemo(() => {
     const filter = vehicleFilter.trim().toLowerCase();
     return vehicles.filter((vehicle) => {
-      const matchesName = !filter || vehicle.vehicle_id.toLowerCase().includes(filter);
+      const matchesName = !filter || vehicle.vehicle_id.toLowerCase().includes(filter) || displayVehicleId(vehicle.vehicle_id).toLowerCase().includes(filter);
       const matchesStatus = statusFilter === "all" || vehicle.status === statusFilter;
-      return matchesName && matchesStatus;
+      const matchesHealth = healthFilter === "all" || healthFilter === vehicleHealth(vehicle, alerts);
+      return matchesName && matchesStatus && matchesHealth;
     });
-  }, [statusFilter, vehicleFilter, vehicles]);
+  }, [alerts, healthFilter, statusFilter, vehicleFilter, vehicles]);
 
   const visibleAlerts = useMemo(() => {
     const filter = alertSearch.trim().toLowerCase();
     return alerts.filter((alert) => {
-      const matchesSearch = !filter || alert.vehicle_id.toLowerCase().includes(filter) || alert.alert_id.toLowerCase().includes(filter);
+      const matchesSearch = !filter || alert.vehicle_id.toLowerCase().includes(filter) || displayVehicleId(alert.vehicle_id).toLowerCase().includes(filter) || alert.alert_id.toLowerCase().includes(filter);
       const matchesSeverity = alertSeverityFilter === "all" || alert.severity === alertSeverityFilter;
       const matchesStatus = alertStatusFilter === "all" || alert.status === alertStatusFilter;
       return matchesSearch && matchesSeverity && matchesStatus;
@@ -535,10 +560,11 @@ export default function App() {
   const chartMax = Math.max(1, ...analytics.map((point) => point.unique_events));
   const eventTrendPath = analytics.map((point, index) => `${analytics.length < 2 ? 50 : 36 + (index / (analytics.length - 1)) * 640},${150 - (point.unique_events / chartMax) * 128}`).join(" ");
   const idleTrendPath = analytics.map((point, index) => `${analytics.length < 2 ? 50 : 36 + (index / (analytics.length - 1)) * 640},${150 - (point.idling_events / Math.max(1, ...analytics.map((row) => row.idling_events))) * 115}`).join(" ");
-  const statusTotal = Math.max(1, overview.moving_now + overview.idling_now + overview.inactive_now + overview.offline);
-  const movingPct = (overview.moving_now / statusTotal) * 100;
-  const idlePct = movingPct + (overview.idling_now / statusTotal) * 100;
-  const inactivePct = idlePct + (overview.inactive_now / statusTotal) * 100;
+  const fuelTrendMax = Math.max(1, ...analytics.map((point) => point.moving_events));
+  const fuelTrendPath = analytics.map((point, index) => `${analytics.length < 2 ? 50 : 36 + (index / (analytics.length - 1)) * 640},${150 - (point.moving_events / fuelTrendMax) * 128}`).join(" ");
+  const healthTotal = Math.max(1, overview.vehicles_seen);
+  const healthyPct = (overview.healthy_vehicles / healthTotal) * 100;
+  const warningPct = healthyPct + (overview.warning_vehicles / healthTotal) * 100;
   const sectionMeta: Record<string, { title: string; subtitle: string }> = {
     overview: { title: "Dashboard", subtitle: "Live fleet health, vehicle activity, and operational signals." },
     map: { title: "Fleet Overview", subtitle: "See current vehicle locations and status across your fleet." },
@@ -660,22 +686,22 @@ export default function App() {
 
           <section className="metrics overview-metrics" aria-label="Fleet summary">
             <article className="metric-card panel"><div className="metric-top"><span>Total vehicles</span><span className="metric-icon blue">▣</span></div><strong>{loading ? "—" : overview.vehicles_seen.toLocaleString()}</strong><small>Vehicles with telemetry observed</small></article>
-            <article className="metric-card panel"><div className="metric-top"><span>Active now</span><span className="metric-icon green">↗</span></div><strong>{loading ? "—" : (overview.moving_now + overview.idling_now).toLocaleString()}</strong><small>Moving or idling · last 5 minutes</small></article>
-            <article className="metric-card panel"><div className="metric-top"><span>Open alerts</span><span className="metric-icon red">!</span></div><strong>{loading ? "—" : overview.open_alerts.toLocaleString()}</strong><small>Require fleet operator attention</small></article>
-            <article className="metric-card panel"><div className="metric-top"><span>Fuel spend · this month</span><span className="metric-icon orange">₹</span></div><strong>{fuelLoading || fuelError ? "—" : formatRupees(fuelSummary?.month_cost ?? 0)}</strong><small>{fuelSummary?.month_purchase_count ?? 0} simulated fuel stops</small></article>
+            <article className="metric-card panel health-metric healthy-metric"><div className="metric-top"><span>Healthy</span><span className="metric-icon green">✓</span></div><strong>{loading ? "—" : overview.healthy_vehicles.toLocaleString()}</strong><small>Online with no active warnings</small></article>
+            <article className="metric-card panel health-metric warning-metric"><div className="metric-top"><span>Warnings</span><span className="metric-icon orange">!</span></div><strong>{loading ? "—" : overview.warning_vehicles.toLocaleString()}</strong><small>Offline or warning severity</small></article>
+            <article className="metric-card panel health-metric critical-metric"><div className="metric-top"><span>Critical</span><span className="metric-icon red">▲</span></div><strong>{loading ? "—" : overview.critical_vehicles.toLocaleString()}</strong><small>Critical severity alerts</small></article>
           </section>
 
           <section className="overview-charts" aria-label="Fleet health summary">
             <article className="chart-card panel">
-              <div className="chart-card-heading"><div><h2>Fleet health trend</h2><p>Hourly telemetry events · last 24 hours</p></div><span className="chart-chip">Telemetry data</span></div>
+              <div className="chart-card-heading"><div><h2>Fleet activity trend</h2><p>Hourly telemetry events · last 24 hours</p></div><span className="chart-chip">Telemetry data</span></div>
               <div className="line-chart-wrap"><div className="chart-y-labels"><span>{chartMax.toLocaleString()}</span><span>{Math.round(chartMax / 2).toLocaleString()}</span><span>0</span></div><svg className="fleet-line-chart" viewBox="0 0 700 180" role="img" aria-label="Hourly unique events and idling events"><path className="chart-gridline" d="M36 22H676 M36 85H676 M36 150H676"/><polyline className="event-line" points={eventTrendPath}/><polyline className="idle-line" points={idleTrendPath}/></svg></div>
               <div className="chart-x-labels"><span>24 hours ago</span><span>12 hours ago</span><span>Now</span></div>
               <div className="chart-legend"><span><i className="legend-blue" />Unique events</span><span><i className="legend-orange" />Idling samples</span></div>
             </article>
             <article className="chart-card status-chart-card panel">
               <div className="chart-card-heading"><div><h2>Vehicle status</h2><p>Latest observed signal</p></div><span className="status-chart-icon">◉</span></div>
-              <div className="status-chart-body"><div className="status-donut" style={{ background: `conic-gradient(#11a77b 0 ${movingPct}%, #e9952d ${movingPct}% ${idlePct}%, #7b8ba4 ${idlePct}% ${inactivePct}%, #d4dce7 ${inactivePct}% 100%)` }}><div><strong>{overview.vehicles_seen.toLocaleString()}</strong><span>observed</span></div></div><ul className="status-legend"><li><i className="legend-green" /><span>Moving</span><strong>{overview.moving_now}</strong></li><li><i className="legend-orange" /><span>Idling</span><strong>{overview.idling_now}</strong></li><li><i className="legend-slate" /><span>Engine off</span><strong>{overview.inactive_now}</strong></li><li><i className="legend-gray" /><span>Offline</span><strong>{overview.offline}</strong></li></ul></div>
-              <div className="chart-footnote">Status is based on each vehicle’s most recent report.</div>
+              <div className="status-chart-body"><div className="status-donut" style={{ background: `conic-gradient(#11a77b 0 ${healthyPct}%, #e9952d ${healthyPct}% ${warningPct}%, #df4f57 ${warningPct}% 100%)` }}><div><strong>{overview.vehicles_seen.toLocaleString()}</strong><span>vehicles</span></div></div><ul className="status-legend"><li><i className="legend-green" /><span>Healthy</span><strong>{overview.healthy_vehicles.toLocaleString()}</strong></li><li><i className="legend-orange" /><span>Warning</span><strong>{overview.warning_vehicles.toLocaleString()}</strong></li><li><i className="legend-red" /><span>Critical</span><strong>{overview.critical_vehicles.toLocaleString()}</strong></li></ul></div>
+              <div className="chart-footnote">One category per vehicle; stale signals are counted as warnings.</div>
             </article>
           </section>
 
@@ -727,7 +753,10 @@ export default function App() {
 
           <section className="fleet-map-view panel" aria-label="Fleet map and vehicle list">
             <div className="fleet-map-heading"><div><h2>Live fleet map</h2><p>Click a vehicle marker or select a vehicle to open its details.</p></div><div className="map-status-legend"><span><i className="legend-green" />Moving</span><span><i className="legend-orange" />Idling</span><span><i className="legend-slate" />Engine off</span><span><i className="legend-gray" />Offline</span></div></div>
-            <div className="fleet-map-layout"><FleetMap vehicles={settings.showLocations ? visibleVehicles : []} /><aside className="fleet-map-vehicle-list"><div className="map-list-heading"><strong>Vehicle list</strong><span>{visibleVehicles.length}</span></div><label className="map-search"><span aria-hidden="true">⌕</span><input value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)} placeholder="Search by vehicle ID" aria-label="Search map vehicles" /></label><div className="map-vehicle-scroll">{visibleVehicles.map((vehicle) => <button type="button" className="map-vehicle-row" key={vehicle.vehicle_id} onClick={() => { setSelectedVehicleId(vehicle.vehicle_id); setVehicleDetailTab("overview"); setActiveSection("vehicles"); window.location.hash = "vehicles"; }}><span className={`location-dot vehicle-${vehicle.status}`} /><span className="map-vehicle-copy"><strong title={vehicle.vehicle_id}>{displayVehicleId(vehicle.vehicle_id)}</strong><small>{settings.showLocations ? `${vehicle.latitude.toFixed(3)}, ${vehicle.longitude.toFixed(3)}` : "Location hidden by settings"}</small></span><span className={`map-status-tag tag-${vehicle.status}`}>{vehicle.status === "inactive" ? "Engine off" : vehicle.status}</span></button>)}</div></aside></div>
+            <div className="health-filter-tabs" role="group" aria-label="Filter fleet by health">
+              {([ ["all", "All", overview.vehicles_seen], ["healthy", "Healthy", overview.healthy_vehicles], ["warning", "Warning", overview.warning_vehicles], ["critical", "Critical", overview.critical_vehicles] ] as const).map(([key, label, count]) => <button type="button" key={key} aria-pressed={healthFilter === key} className={`health-filter-tab health-filter-${key}${healthFilter === key ? " selected" : ""}`} onClick={() => setHealthFilter(key)}>{label}<span>{count.toLocaleString()}</span></button>)}
+            </div>
+            <div className="fleet-map-layout"><FleetMap vehicles={settings.showLocations ? visibleVehicles : []} /><aside className="fleet-map-vehicle-list"><div className="map-list-heading"><strong>Vehicle list</strong><span>{visibleVehicles.length} shown</span></div><label className="map-search"><span aria-hidden="true">⌕</span><input value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)} placeholder="Search by vehicle ID" aria-label="Search map vehicles" /></label><div className="map-vehicle-scroll">{visibleVehicles.map((vehicle) => { const health = vehicleHealth(vehicle, alerts); return <button type="button" className="map-vehicle-row" key={vehicle.vehicle_id} onClick={() => { setSelectedVehicleId(vehicle.vehicle_id); setVehicleDetailTab("overview"); setActiveSection("vehicles"); window.location.hash = "vehicles"; }}><span className={`location-dot health-dot-${health}`} /><span className="map-vehicle-copy"><strong title={vehicle.vehicle_id}>{displayVehicleId(vehicle.vehicle_id)}</strong><small>{settings.showLocations ? `${vehicle.latitude.toFixed(3)}, ${vehicle.longitude.toFixed(3)}` : "Location hidden by settings"}</small></span><span className={`map-status-tag tag-${health}`}>{health}</span></button>; })}</div></aside></div>
           </section>
 
           <section className="alert-center panel" id="alerts" aria-labelledby="alert-center-title">
@@ -735,7 +764,7 @@ export default function App() {
               <div><div className="section-title-row"><h2 id="alert-center-title">Alert center</h2><span className="count-pill">{loading || error ? "—" : overview.open_alerts} open</span></div><p>Review idling events with the vehicle, severity, duration, and estimated fuel impact.</p></div>
               <div className="alert-filters">
                 <label><span className="sr-only">Search alerts by vehicle or alert ID</span><input value={alertSearch} onChange={(event) => setAlertSearch(event.target.value)} placeholder="Search vehicle or alert ID" /></label>
-                <label><span className="sr-only">Filter alerts by severity</span><select value={alertSeverityFilter} onChange={(event) => setAlertSeverityFilter(event.target.value)}><option value="all">All severities</option><option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Info</option></select></label>
+                <div className="alert-severity-tabs" role="group" aria-label="Filter alerts by severity">{([ ["all", "All", alerts.length], ["critical", "Critical", alerts.filter((alert) => alert.severity === "critical").length], ["warning", "Warning", alerts.filter((alert) => alert.severity === "warning").length] ] as const).map(([key, label, count]) => <button type="button" key={key} aria-pressed={alertSeverityFilter === key} className={`alert-severity-tab severity-${key}${alertSeverityFilter === key ? " selected" : ""}`} onClick={() => setAlertSeverityFilter(key)}>{label}<span>{count}</span></button>)}</div>
                 <label><span className="sr-only">Filter alerts by status</span><select value={alertStatusFilter} onChange={(event) => setAlertStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="open">Open</option><option value="acknowledged">Acknowledged</option><option value="resolved">Resolved</option></select></label>
                 <button className="export-button" type="button" disabled={loading || Boolean(error) || visibleAlerts.length === 0} onClick={() => downloadCsv("fleet-alerts.csv", ["Alert ID", "Vehicle ID", "Rule", "Severity", "Status", "Episode started", "Last observed", "Idle seconds", "Estimated fuel litres"], visibleAlerts.map((alert) => [alert.alert_id, alert.vehicle_id, alert.rule_version, alert.severity, alert.status, alert.episode_started_at, alert.last_observed_at, alert.idle_seconds, alert.estimated_fuel_litres]))}>Export CSV</button>
               </div>
@@ -756,19 +785,20 @@ export default function App() {
               <div><div className="section-title-row"><h2>Fleet activity</h2><span className="count-pill">Live history</span></div><p>Hourly vehicle signals from the selected reporting period.</p></div>
             </div>
             <div className="fuel-kpi-grid analytics-kpi-grid">
-              <article className="metric-card panel"><div className="metric-top"><span>Telemetry events</span><span className="metric-icon blue">↗</span></div><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.events.toLocaleString()}</strong><small>Unique received events</small></article>
-              <article className="metric-card panel"><div className="metric-top"><span>Peak vehicles / hour</span><span className="metric-icon green">▣</span></div><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.vehicles.toLocaleString()}</strong><small>Most active hourly bucket</small></article>
-              <article className="metric-card panel"><div className="metric-top"><span>Idling events</span><span className="metric-icon orange">Ⅱ</span></div><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.idling.toLocaleString()}</strong><small>Engine on · speed ≤ 0.5 km/h</small></article>
-              <article className="metric-card panel"><div className="metric-top"><span>Moving events</span><span className="metric-icon green">➜</span></div><strong>{analyticsLoading || analyticsError ? "—" : analyticsTotals.moving.toLocaleString()}</strong><small>Engine on · speed above 0.5 km/h</small></article>
+              <article className="metric-card panel"><div className="metric-top"><span>Total distance</span><span className="metric-icon blue">↗</span></div><strong>{analyticsLoading || analyticsError ? "—" : `${estimatedDistanceKm.toLocaleString(undefined, { maximumFractionDigits: 0 })} km`}</strong><small>Estimated from moving samples</small></article>
+              <article className="metric-card panel"><div className="metric-top"><span>Fuel consumption</span><span className="metric-icon orange">⛽</span></div><strong>{analyticsLoading || analyticsError ? "—" : `${estimatedFuelLitres.toLocaleString(undefined, { maximumFractionDigits: 0 })} L`}</strong><small>Estimated at 10 km/L</small></article>
+              <article className="metric-card panel"><div className="metric-top"><span>Avg. utilization</span><span className="metric-icon green">▣</span></div><strong>{analyticsLoading || analyticsError ? "—" : `${utilizationPercent.toFixed(1)}%`}</strong><small>Moving samples / moving + idle</small></article>
+              <article className="metric-card panel"><div className="metric-top"><span>CO₂ emissions</span><span className="metric-icon violet">◌</span></div><strong>{analyticsLoading || analyticsError ? "—" : `${estimatedCo2Tonnes.toFixed(1)} t`}</strong><small>Estimated from fuel consumption</small></article>
             </div>
             <article className="chart-card panel analytics-chart-card">
-              <div className="chart-card-heading"><div><h2>Fleet activity trend</h2><p>Hourly counts · use Reports to download the underlying rows</p></div><span className="chart-chip">Live query</span></div>
+              <div className="chart-card-heading"><div><h2>Fuel consumption trend</h2><p>Hourly estimated fuel · based on moving telemetry samples</p></div><span className="chart-chip">Live query</span></div>
               {analyticsLoading ? <div className="empty-state"><span className="loading-ring" />Loading fleet activity…</div> : analyticsError ? <div className="empty-state"><strong>Analytics unavailable</strong><span>{analyticsError}</span></div> : analytics.length === 0 ? <div className="empty-state"><strong>No events in this period</strong><span>New telemetry will appear here when it is received.</span></div> : <>
-                <div className="line-chart-wrap"><div className="chart-y-labels"><span>{chartMax.toLocaleString()}</span><span>{Math.round(chartMax / 2).toLocaleString()}</span><span>0</span></div><svg className="fleet-line-chart" viewBox="0 0 700 180" role="img" aria-label="Hourly moving and idling telemetry events"><path className="chart-gridline" d="M36 22H676 M36 85H676 M36 150H676"/><polyline className="event-line" points={eventTrendPath}/><polyline className="idle-line" points={idleTrendPath}/></svg></div>
+                <div className="line-chart-wrap"><div className="chart-y-labels"><span>{Math.round(fuelTrendMax / 10).toLocaleString()} L</span><span>{Math.round(fuelTrendMax / 20).toLocaleString()} L</span><span>0</span></div><svg className="fleet-line-chart" viewBox="0 0 700 180" role="img" aria-label="Hourly estimated fuel consumption trend"><path className="chart-gridline" d="M36 22H676 M36 85H676 M36 150H676"/><polyline className="event-line" points={fuelTrendPath}/><polyline className="idle-line" points={idleTrendPath}/></svg></div>
                 <div className="chart-x-labels"><span>{new Date(analytics[0].bucket_start_epoch_ms).toLocaleString()}</span><span>{new Date(analytics.at(-1)!.bucket_start_epoch_ms).toLocaleString()}</span></div>
-                <div className="chart-legend"><span><i className="legend-blue" />Unique events</span><span><i className="legend-orange" />Idling events</span></div>
+                <div className="chart-legend"><span><i className="legend-blue" />Estimated fuel (L)</span><span><i className="legend-orange" />Idling samples</span></div>
               </>}
             </article>
+            <div className="fuel-demo-note analytics-estimate-note"><strong>How these estimates work:</strong> moving reports count as one second of travel at an illustrative 45 km/h fleet speed; fuel uses 10 km/L and CO₂ uses 2.68 kg/L. These demo estimates update with telemetry and are not vehicle sensor or odometer readings.</div>
             <div className="table-footer"><span>Analytics refresh with the live dashboard.</span><span>Events are grouped by hour in UTC.</span></div>
           </section>
 

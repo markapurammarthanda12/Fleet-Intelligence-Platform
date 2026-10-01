@@ -209,6 +209,37 @@ tbody tr:hover { background: #fbfcff; }
   .alert-filters input { width: 100%; }
 }
 
+/* Fleet health controls and the reference dashboard's compact status treatments. */
+.overview-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.health-metric { position: relative; }
+.health-metric::after { position: absolute; right: 14px; bottom: 11px; color: #9aa7b8; font-size: 8px; }
+.health-metric.healthy-metric { border-top: 3px solid #12a77b; }
+.health-metric.warning-metric { border-top: 3px solid #e99b2f; }
+.health-metric.critical-metric { border-top: 3px solid #e24e58; }
+.status-legend .legend-red { background: #df4f57; }
+.health-filter-tabs { display: flex; gap: 8px; padding: 0 17px 13px; flex-wrap: wrap; }
+.health-filter-tab, .alert-severity-tab { display: inline-flex; min-height: 31px; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid #e5eaf2; border-radius: 7px; background: #fff; color: #66758c; font-size: 9px; font-weight: 650; transition: .16s ease; }
+.health-filter-tab span, .alert-severity-tab span { color: #8491a5; font-variant-numeric: tabular-nums; }
+.health-filter-tab:hover, .alert-severity-tab:hover { border-color: #c9d6f2; background: #f8faff; }
+.health-filter-tab.selected { border-color: #8cabf8; background: #edf3ff; color: #285bd1; }
+.health-filter-healthy.selected { border-color: #a4dfc9; background: #eefaf5; color: #11835f; }
+.health-filter-warning.selected { border-color: #f4d29e; background: #fff8ec; color: #a96908; }
+.health-filter-critical.selected { border-color: #f2b7bb; background: #fff2f2; color: #bd3942; }
+.alert-severity-tabs { display: flex; gap: 5px; }
+.alert-severity-tab { min-height: 30px; padding: 0 9px; }
+.alert-severity-tab.selected { border-color: #9ab6fa; background: #eef4ff; color: #315fcb; }
+.alert-severity-tab.severity-warning.selected { border-color: #f4d29e; background: #fff8ec; color: #a96908; }
+.alert-severity-tab.severity-critical.selected { border-color: #f2b7bb; background: #fff2f2; color: #bd3942; }
+.tag-healthy { background: #eaf8f2; color: #16835e; }
+.tag-warning { background: #fff5e6; color: #aa6a13; }
+.tag-critical { background: #fff0ef; color: #bd3942; }
+.health-dot-healthy { background: #1da77a; }
+.health-dot-warning { background: #e99b2f; }
+.health-dot-critical { background: #df4f57; }
+.analytics-estimate-note { margin-top: 0; }
+@media (max-width: 900px) { .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .health-filter-tabs { padding-right: 11px; padding-left: 11px; gap: 5px; } .health-filter-tab { padding-right: 8px; padding-left: 8px; } .alert-severity-tabs { flex-wrap: wrap; } }
+
 @media (max-width: 900px) {
   .app-layout { grid-template-columns: 190px minmax(0, 1fr); }
   .sidebar { padding-right: 10px; padding-left: 10px; }

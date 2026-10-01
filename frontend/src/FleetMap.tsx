@@ -14,7 +14,11 @@ export type MapVehicle = {
 type Props = { vehicles: MapVehicle[] };
 
 const statusColor: Record<string, string> = { moving: "#11a77b", idling: "#e9952d", inactive: "#7b8ba4", offline: "#9aa6b7" };
-const shortVehicleId = (value: string) => value.length > 20 ? `${value.slice(0, 12)}…${value.slice(-6)}` : value;
+const shortVehicleId = (value: string) => {
+  const numberedId = value.match(/^vehicle-0*(\d+)$/i);
+  if (numberedId) return `VH-${numberedId[1]}`;
+  return value.length > 20 ? `${value.slice(0, 12)}…${value.slice(-6)}` : value;
+};
 
 export default function FleetMap({ vehicles }: Props) {
   const element = useRef<HTMLDivElement | null>(null);

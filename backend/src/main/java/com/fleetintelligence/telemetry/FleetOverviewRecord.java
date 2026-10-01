@@ -8,6 +8,9 @@ public record FleetOverviewRecord(
         long idlingNow,
         long inactiveNow,
         long offline,
+        long healthyVehicles,
+        long warningVehicles,
+        long criticalVehicles,
         long openAlerts,
         double estimatedIdleFuelLitres,
         Instant latestEventAt) {

@@ -46,6 +46,7 @@ def main() -> None:
 
     rng = random.Random(args.seed)
     sequence = 0
+    simulation_started = time.monotonic()
     LOG.info(
         "Live synthetic telemetry started: fleet=%s vehicles=%s rate=%s events/s",
         args.tenant_id,
@@ -57,14 +58,29 @@ def main() -> None:
             batch_start = time.monotonic()
             futures = []
             for _ in range(args.events_per_second):
-                vehicle_number = sequence % args.vehicles
+                batch_slot = sequence % args.events_per_second
+                # Keep two real telemetry-driven demo scenarios active so the UI
+                # consistently demonstrates warning and critical escalation.
+                # VH-2048 idles for alternating 10-minute windows (warning only);
+                # VH-7182 remains idling (escalates to critical after 15 minutes).
+                warning_scenario = batch_slot == 0 and args.vehicles > 2048
+                critical_scenario = batch_slot == 1 and args.events_per_second > 1 and args.vehicles > 7182
+                if warning_scenario:
+                    vehicle_number = 2048
+                elif critical_scenario:
+                    vehicle_number = 7182
+                else:
+                    vehicle_number = sequence % args.vehicles
+                    if vehicle_number in {2048, 7182}:
+                        vehicle_number = (vehicle_number + 2) % args.vehicles
+                minute_in_cycle = int((time.monotonic() - simulation_started) // 60) % 20
+                stationary = (minute_in_cycle < 10) if warning_scenario else (True if critical_scenario else rng.random() < 0.12)
                 # Vehicles follow bounded paths around Bengaluru; each position is generated
                 # from the vehicle identity and event sequence, never from a UI fixture.
                 angle = (vehicle_number * 0.61803398875 + sequence * 0.013) % (2 * math.pi)
                 radius = 0.01 + ((vehicle_number % 97) / 97) * 0.22
                 latitude = 12.9716 + math.sin(angle) * radius
                 longitude = 77.5946 + math.cos(angle) * radius
-                stationary = rng.random() < 0.12
                 event = {
                     "event_id": str(uuid.uuid4()),
                     "tenant_id": args.tenant_id,

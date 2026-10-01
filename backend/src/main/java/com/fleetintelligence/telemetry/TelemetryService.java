@@ -89,8 +89,9 @@ public class TelemetryService {
                 FROM fleet_alerts
                 WHERE tenant_id = ?
                 ORDER BY CASE WHEN status = 'open' THEN 0 ELSE 1 END,
+                         last_observed_at DESC,
                          CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
-                         idle_seconds DESC, last_observed_at DESC
+                         idle_seconds DESC
                 LIMIT ?
                 """,
                 alertRowMapper(),
@@ -131,12 +132,25 @@ public class TelemetryService {
                        count(*) FILTER (WHERE last_observed_at >= now() - interval '5 minutes'
                            AND NOT engine_on) AS inactive_now,
                        count(*) FILTER (WHERE last_observed_at < now() - interval '5 minutes') AS offline,
+                       count(*) FILTER (WHERE coalesce(alerts.severity_rank, 0) = 2) AS critical_vehicles,
+                       count(*) FILTER (WHERE coalesce(alerts.severity_rank, 0) = 1
+                           OR (coalesce(alerts.severity_rank, 0) = 0
+                               AND state.last_observed_at < now() - interval '5 minutes')) AS warning_vehicles,
+                       count(*) FILTER (WHERE coalesce(alerts.severity_rank, 0) = 0
+                           AND state.last_observed_at >= now() - interval '5 minutes') AS healthy_vehicles,
                        (SELECT count(*) FROM fleet_alerts WHERE tenant_id = ? AND status = 'open') AS open_alerts,
                        (SELECT coalesce(sum(estimated_fuel_litres), 0)
                         FROM fleet_alerts WHERE tenant_id = ? AND status = 'open') AS estimated_idle_fuel_litres,
                        max(last_observed_at) AS latest_event_at
-                FROM vehicle_runtime_state
-                WHERE tenant_id = ?
+                FROM vehicle_runtime_state state
+                LEFT JOIN (
+                    SELECT tenant_id, vehicle_id,
+                           max(CASE severity WHEN 'critical' THEN 2 WHEN 'warning' THEN 1 ELSE 0 END) AS severity_rank
+                    FROM fleet_alerts
+                    WHERE tenant_id = ? AND status = 'open'
+                    GROUP BY tenant_id, vehicle_id
+                ) alerts USING (tenant_id, vehicle_id)
+                WHERE state.tenant_id = ?
                 """,
                 (result, row) -> new FleetOverviewRecord(
                         result.getLong("vehicles_seen"),
@@ -144,11 +158,14 @@ public class TelemetryService {
                         result.getLong("idling_now"),
                         result.getLong("inactive_now"),
                         result.getLong("offline"),
+                        result.getLong("healthy_vehicles"),
+                        result.getLong("warning_vehicles"),
+                        result.getLong("critical_vehicles"),
                         result.getLong("open_alerts"),
                         result.getDouble("estimated_idle_fuel_litres"),
                         result.getTimestamp("latest_event_at") == null
                                 ? null : result.getTimestamp("latest_event_at").toInstant()),
-                tenantId, tenantId, tenantId);
+                tenantId, tenantId, tenantId, tenantId);
     }
 
     public List<VehicleOverviewRecord> vehicles(String tenantId, int limit) {
