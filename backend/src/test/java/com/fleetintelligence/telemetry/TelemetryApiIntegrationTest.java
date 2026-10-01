@@ -181,6 +181,18 @@ class TelemetryApiIntegrationTest {
                 "SELECT count(*) FROM telemetry_events WHERE tenant_id = 'tenant-demo' AND vehicle_id = 'late-vehicle'",
                 Integer.class);
         org.assertj.core.api.Assertions.assertThat(storedEvents).isEqualTo(3);
+
+        jdbcTemplate.queryForObject("""
+                SELECT last_observed_at, speed_kmh
+                FROM vehicle_runtime_state
+                WHERE tenant_id = 'tenant-demo' AND vehicle_id = 'late-vehicle'
+                """, (result, row) -> {
+            org.assertj.core.api.Assertions.assertThat(result.getTimestamp("last_observed_at").toInstant())
+                    .isEqualTo(Instant.parse("2026-09-30T08:06:00Z"));
+            org.assertj.core.api.Assertions.assertThat(result.getBigDecimal("speed_kmh"))
+                    .isEqualByComparingTo("0.00");
+            return true;
+        });
     }
 
     @Test

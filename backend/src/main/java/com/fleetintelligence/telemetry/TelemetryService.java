@@ -98,26 +98,20 @@ public class TelemetryService {
 
     public FleetOverviewRecord overview(String tenantId) {
         return jdbcTemplate.queryForObject("""
-                WITH latest AS (
-                    SELECT DISTINCT ON (vehicle_id)
-                           vehicle_id, observed_at, speed_kmh, engine_on
-                    FROM telemetry_events
-                    WHERE tenant_id = ?
-                    ORDER BY vehicle_id, observed_at DESC, event_sequence DESC NULLS LAST, ingested_at DESC
-                )
                 SELECT count(*) AS vehicles_seen,
-                       count(*) FILTER (WHERE observed_at >= now() - interval '5 minutes'
+                       count(*) FILTER (WHERE last_observed_at >= now() - interval '5 minutes'
                            AND engine_on AND speed_kmh > 0.5) AS moving_now,
-                       count(*) FILTER (WHERE observed_at >= now() - interval '5 minutes'
+                       count(*) FILTER (WHERE last_observed_at >= now() - interval '5 minutes'
                            AND engine_on AND speed_kmh <= 0.5) AS idling_now,
-                       count(*) FILTER (WHERE observed_at >= now() - interval '5 minutes'
+                       count(*) FILTER (WHERE last_observed_at >= now() - interval '5 minutes'
                            AND NOT engine_on) AS inactive_now,
-                       count(*) FILTER (WHERE observed_at < now() - interval '5 minutes') AS offline,
+                       count(*) FILTER (WHERE last_observed_at < now() - interval '5 minutes') AS offline,
                        (SELECT count(*) FROM fleet_alerts WHERE tenant_id = ? AND status = 'open') AS open_alerts,
                        (SELECT coalesce(sum(estimated_fuel_litres), 0)
                         FROM fleet_alerts WHERE tenant_id = ? AND status = 'open') AS estimated_idle_fuel_litres,
-                       (SELECT max(observed_at) FROM latest) AS latest_event_at
-                FROM latest
+                       max(last_observed_at) AS latest_event_at
+                FROM vehicle_runtime_state
+                WHERE tenant_id = ?
                 """,
                 (result, row) -> new FleetOverviewRecord(
                         result.getLong("vehicles_seen"),
@@ -134,23 +128,18 @@ public class TelemetryService {
 
     public List<VehicleOverviewRecord> vehicles(String tenantId, int limit) {
         return jdbcTemplate.query("""
-                SELECT latest.tenant_id, latest.vehicle_id, latest.observed_at,
-                       latest.latitude, latest.longitude, latest.speed_kmh, latest.engine_on,
-                       CASE WHEN latest.observed_at < now() - interval '5 minutes' THEN 'offline'
-                            WHEN NOT latest.engine_on THEN 'inactive'
-                            WHEN latest.speed_kmh <= 0.5 THEN 'idling'
+                SELECT state.tenant_id, state.vehicle_id, state.last_observed_at AS observed_at,
+                       state.latitude, state.longitude, state.speed_kmh, state.engine_on,
+                       CASE WHEN state.last_observed_at < now() - interval '5 minutes' THEN 'offline'
+                            WHEN NOT state.engine_on THEN 'inactive'
+                            WHEN state.speed_kmh <= 0.5 THEN 'idling'
                             ELSE 'moving' END AS status,
                        (SELECT count(*) FROM fleet_alerts alert
-                        WHERE alert.tenant_id = latest.tenant_id
-                          AND alert.vehicle_id = latest.vehicle_id AND alert.status = 'open') AS open_alert_count
-                FROM (
-                    SELECT DISTINCT ON (vehicle_id)
-                           tenant_id, vehicle_id, observed_at, latitude, longitude, speed_kmh, engine_on
-                    FROM telemetry_events
-                    WHERE tenant_id = ?
-                    ORDER BY vehicle_id, observed_at DESC, event_sequence DESC NULLS LAST, ingested_at DESC
-                ) latest
-                ORDER BY latest.observed_at DESC
+                        WHERE alert.tenant_id = state.tenant_id
+                          AND alert.vehicle_id = state.vehicle_id AND alert.status = 'open') AS open_alert_count
+                FROM vehicle_runtime_state state
+                WHERE state.tenant_id = ?
+                ORDER BY state.last_observed_at DESC
                 LIMIT ?
                 """,
                 (result, row) -> new VehicleOverviewRecord(
@@ -190,12 +179,14 @@ public class TelemetryService {
             Instant stationarySince = stationary ? event.observedAt() : null;
             jdbcTemplate.update("""
                     INSERT INTO vehicle_runtime_state (
-                        tenant_id, vehicle_id, last_observed_at, stationary_since, alert_open
-                    ) VALUES (?, ?, ?, ?, false)
+                        tenant_id, vehicle_id, last_observed_at, stationary_since, alert_open,
+                        latitude, longitude, speed_kmh, engine_on, event_sequence
+                    ) VALUES (?, ?, ?, ?, false, ?, ?, ?, ?, ?)
                     ON CONFLICT (tenant_id, vehicle_id) DO NOTHING
                     """,
                     event.tenantId(), event.vehicleId(), Timestamp.from(event.observedAt()),
-                    stationarySince == null ? null : Timestamp.from(stationarySince));
+                    stationarySince == null ? null : Timestamp.from(stationarySince),
+                    event.latitude(), event.longitude(), event.speedKmh(), event.engineOn(), event.sequence());
             return;
         }
 
@@ -227,12 +218,19 @@ public class TelemetryService {
 
         jdbcTemplate.update("""
                 UPDATE vehicle_runtime_state
-                SET last_observed_at = ?, stationary_since = ?, alert_open = ?, updated_at = now()
+                SET last_observed_at = ?, stationary_since = ?, alert_open = ?,
+                    latitude = ?, longitude = ?, speed_kmh = ?, engine_on = ?, event_sequence = ?,
+                    updated_at = now()
                 WHERE tenant_id = ? AND vehicle_id = ?
                 """,
                 Timestamp.from(event.observedAt()),
                 stationarySince == null ? null : Timestamp.from(stationarySince),
                 alertOpen,
+                event.latitude(),
+                event.longitude(),
+                event.speedKmh(),
+                event.engineOn(),
+                event.sequence(),
                 event.tenantId(),
                 event.vehicleId());
     }
