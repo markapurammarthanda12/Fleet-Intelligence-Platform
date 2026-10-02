@@ -49,6 +49,10 @@ public class TelemetryService {
                 event.speedKmh(),
                 event.engineOn(),
                 event.sequence());
+        if (inserted == 0) {
+            return true;
+        }
+
         jdbcTemplate.update("""
                 INSERT INTO tenants (tenant_id) VALUES (?)
                 ON CONFLICT (tenant_id) DO NOTHING
@@ -57,12 +61,6 @@ public class TelemetryService {
                 INSERT INTO vehicles (tenant_id, vehicle_id) VALUES (?, ?)
                 ON CONFLICT (tenant_id, vehicle_id) DO NOTHING
                 """, event.tenantId(), event.vehicleId());
-
-
-        if (inserted == 0) {
-            return true;
-        }
-
         updateVehicleState(event);
         return false;
     }
@@ -178,7 +176,11 @@ public class TelemetryService {
                 tenantId, tenantId, tenantId, tenantId);
     }
 
-    public List<VehicleOverviewRecord> vehicles(String tenantId, int limit) {
+    public List<VehicleOverviewRecord> vehicles(String tenantId, int limit, int offset, String healthStatus) {
+        String health = healthStatus == null ? "all" : healthStatus.toLowerCase();
+        if (!List.of("all", "healthy", "warning", "critical").contains(health)) {
+            throw new IllegalArgumentException("health_status must be all, healthy, warning, or critical");
+        }
         return jdbcTemplate.query("""
                 SELECT state.tenant_id, state.vehicle_id, state.last_observed_at AS observed_at,
                        state.latitude, state.longitude, state.speed_kmh, state.engine_on,
@@ -186,13 +188,29 @@ public class TelemetryService {
                             WHEN NOT state.engine_on THEN 'inactive'
                             WHEN state.speed_kmh <= 0.5 THEN 'idling'
                             ELSE 'moving' END AS status,
-                       (SELECT count(*) FROM fleet_alerts alert
-                        WHERE alert.tenant_id = state.tenant_id
-                          AND alert.vehicle_id = state.vehicle_id AND alert.status = 'open') AS open_alert_count
+                       coalesce(alerts.open_alert_count, 0) AS open_alert_count,
+                       CASE WHEN coalesce(alerts.severity_rank, 0) = 2 THEN 'critical'
+                            WHEN coalesce(alerts.severity_rank, 0) = 1
+                              OR state.last_observed_at < now() - interval '5 minutes' THEN 'warning'
+                            ELSE 'healthy' END AS health_status
                 FROM vehicle_runtime_state state
+                LEFT JOIN (
+                    SELECT tenant_id, vehicle_id, count(*) AS open_alert_count,
+                           max(CASE severity WHEN 'critical' THEN 2 WHEN 'warning' THEN 1 ELSE 0 END) AS severity_rank
+                    FROM fleet_alerts
+                    WHERE tenant_id = ? AND status = 'open'
+                    GROUP BY tenant_id, vehicle_id
+                ) alerts ON alerts.tenant_id = state.tenant_id AND alerts.vehicle_id = state.vehicle_id
                 WHERE state.tenant_id = ?
+                  AND (? = 'all'
+                    OR (? = 'critical' AND coalesce(alerts.severity_rank, 0) = 2)
+                    OR (? = 'warning' AND (coalesce(alerts.severity_rank, 0) = 1
+                        OR (coalesce(alerts.severity_rank, 0) = 0
+                            AND state.last_observed_at < now() - interval '5 minutes')))
+                    OR (? = 'healthy' AND coalesce(alerts.severity_rank, 0) = 0
+                        AND state.last_observed_at >= now() - interval '5 minutes'))
                 ORDER BY state.last_observed_at DESC
-                LIMIT ?
+                LIMIT ? OFFSET ?
                 """,
                 (result, row) -> new VehicleOverviewRecord(
                         result.getString("tenant_id"),
@@ -202,9 +220,11 @@ public class TelemetryService {
                         result.getBigDecimal("latitude"),
                         result.getBigDecimal("longitude"),
                         result.getBigDecimal("speed_kmh"),
-                        result.getLong("open_alert_count")),
-                tenantId,
-                Math.max(1, Math.min(limit, 500)));
+                        result.getLong("open_alert_count"),
+                        result.getString("health_status")),
+                tenantId, tenantId,
+                health, health, health, health,
+                Math.max(1, Math.min(limit, 500)), Math.max(0, offset));
     }
 
     private void updateVehicleState(TelemetryRequest event) {
