@@ -15,7 +15,7 @@ The persistent local Compose database has Flyway V1–V7 applied. On 2026-10-02 
 - The API exposes readiness through Spring Boot Actuator and supports bounded telemetry history queries.
 - Hosted API mode validates OAuth2/OIDC JWTs against a configured issuer, checks `fleet.read` / `fleet.ingest` scopes, and rejects tenant IDs that do not match the signed `tenant_id` claim. Local Compose explicitly selects an unauthenticated demo mode for quick local use.
 - Fleet overview and vehicle-list APIs derive counts, current status, last seen time, and last reported coordinates from each tenant's latest telemetry; the dashboard uses these APIs for its overview.
-- The summary counts include the entire fleet. For responsiveness, the map and vehicle table request the 200 latest vehicle reports, not 100,000 Leaflet markers at once; all points shown still come from telemetry coordinates.
+- The summary counts include the entire fleet. The full map filters on the server by the selected health category and displays up to 100 matching locations per page with Previous/Next navigation; the vehicle table requests up to 200 recent reports. Full-map marker colors follow vehicle health, while the dashboard mini-map uses motion-status colors.
 - The dashboard follows a fleet-operations layout with a dark navigation rail, summary cards, fleet trend charts, status donut, searchable map/list, alert center, analytics, vehicle details, a local demo rule catalog, reports, and browser-local settings. The local demo workspace is selected automatically; operators do not type an internal tenant ID.
 - Core dashboard, vehicle, map, alert, and report values come only from API/database telemetry. If a service is unavailable, the dashboard shows an error or an empty state; it never substitutes a hardcoded fleet. Map coordinates are taken from telemetry records. The fleet map uses Leaflet and OpenStreetMap tiles with attribution.
 - An optional Python live-simulator service emits changing synthetic telemetry through the same validated API and Kafka path as other vehicle events. This is generated test data, not data from physical connected vehicles.
@@ -39,7 +39,7 @@ Docker is part of the deliverable. Compose defines the API, single-node local Ap
 
 The generator creates exactly 100,000 synthetic vehicle records and a base telemetry snapshot; the checked-in compressed dataset is described in [data/README.md](data/README.md), while generated uncompressed JSONL files are ignored by Git. A separate optional stream changes positions and speed at a configurable rate. This does not claim that the current API sustains the challenge's 100,000 events/second target.
 
-Track remaining work and evidence by priority in the [project checklist](docs/PROJECT_CHECKLIST.md). For new agents, the [handoff guide](docs/AGENT_HANDOFF.md) explains the project context and workflow.
+For a panel walkthrough, follow the [Panel Demo Guide](docs/PANEL_DEMO_GUIDE.md) for the exact page order, CSV export locations, architecture diagram, and evidence-safe performance wording. Track remaining work and evidence by priority in the [project checklist](docs/PROJECT_CHECKLIST.md). For new agents, the [handoff guide](docs/AGENT_HANDOFF.md) explains the project context and workflow.
 
 ## Quick start
 
