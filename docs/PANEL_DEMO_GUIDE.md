@@ -1,6 +1,6 @@
 # Panel Demo Guide
 
-This guide gives the panel a clear path through the Fleet Intelligence Platform. Use it with the explainer script; the screen directions below use the exact navigation names shown in the demo.
+This guide gives the panel a clear path through the Fleet Intelligence Platform. Use it with the [full explainer video script](EXPLAINER_VIDEO_SCRIPT.md); the screen directions below use the exact navigation names shown in the demo.
 
 ## Before the presentation
 
