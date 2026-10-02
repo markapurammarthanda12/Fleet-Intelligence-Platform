@@ -20,7 +20,9 @@ public class VehicleController {
     @PreAuthorize("hasAuthority('SCOPE_fleet.read') and #p0 == authentication.tokenAttributes['tenant_id']")
     public List<VehicleOverviewRecord> list(
             @RequestParam(name = "tenant_id") String tenantId,
-            @RequestParam(defaultValue = "200") int limit) {
-        return telemetryService.vehicles(tenantId, limit);
+            @RequestParam(defaultValue = "200") int limit,
+            @RequestParam(defaultValue = "0") int offset,
+            @RequestParam(name = "health_status", defaultValue = "all") String healthStatus) {
+        return telemetryService.vehicles(tenantId, limit, offset, healthStatus);
     }
 }
