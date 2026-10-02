@@ -77,9 +77,11 @@ type FleetVehicle = {
   longitude: number;
   speed_kmh: number;
   open_alert_count: number;
+  health_status: "healthy" | "warning" | "critical";
 };
 
 function vehicleHealth(vehicle: FleetVehicle, alerts: FleetAlert[]) {
+  if (vehicle.health_status) return vehicle.health_status;
   if (alerts.some((alert) => alert.vehicle_id === vehicle.vehicle_id && alert.status === "open" && alert.severity === "critical")) return "critical";
   if (vehicle.status === "offline" || alerts.some((alert) => alert.vehicle_id === vehicle.vehicle_id && alert.status === "open" && alert.severity === "warning")) return "warning";
   return "healthy";
@@ -104,6 +106,7 @@ const defaultRules: DemoRule[] = [
   { id: "offline-v1", name: "Vehicle signal stale", category: "Health", condition: "No event received for 5 min", action: "Mark vehicle offline", active: true },
 ];
 const defaultSettings: DemoSettings = { organization: "Demo fleet", timeZone: "Asia/Kolkata", dateFormat: "DD/MM/YYYY", language: "English", realTimeAlerts: true, autoAcknowledge: false, showLocations: true };
+const MAP_PAGE_SIZE = 100;
 
 const emptyOverview: FleetOverview = {
   vehicles_seen: 0,
@@ -195,6 +198,7 @@ function normalizeVehicle(raw: Record<string, unknown>): FleetVehicle {
     longitude: Number(raw.longitude ?? 0),
     speed_kmh: Number(apiValue(raw, "speedKmh", "speed_kmh") ?? 0),
     open_alert_count: Number(apiValue(raw, "openAlertCount", "open_alert_count") ?? 0),
+    health_status: String(apiValue(raw, "healthStatus", "health_status") ?? "healthy") as FleetVehicle["health_status"],
   };
 }
 
@@ -295,6 +299,10 @@ export default function App() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [healthFilter, setHealthFilter] = useState("all");
+  const [mapVehicles, setMapVehicles] = useState<FleetVehicle[]>([]);
+  const [mapOffset, setMapOffset] = useState(0);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [mapError, setMapError] = useState("");
   const [alertSearch, setAlertSearch] = useState("");
   const [alertSeverityFilter, setAlertSeverityFilter] = useState("all");
   const [alertStatusFilter, setAlertStatusFilter] = useState("all");
@@ -411,6 +419,43 @@ export default function App() {
     const timer = window.setInterval(() => void refresh(), 5000);
     return () => window.clearInterval(timer);
   }, [demoSignedIn, refresh, settings.realTimeAlerts]);
+
+  useEffect(() => {
+    if (!demoSignedIn || activeSection !== "map") return;
+    let active = true;
+    const refreshMapPage = async () => {
+      setMapLoading(true);
+      try {
+        const query = new URLSearchParams({
+          tenant_id: DEMO_TENANT_ID,
+          health_status: healthFilter,
+          limit: String(MAP_PAGE_SIZE),
+          offset: String(mapOffset),
+        });
+        const response = await fetch(`/api/v1/vehicles?${query.toString()}`, { headers: { Accept: "application/json" } });
+        if (!response.ok) throw new Error(`The fleet API returned ${response.status}.`);
+        const rows = await response.json() as Array<Record<string, unknown>>;
+        if (active) {
+          setMapVehicles(rows.map(normalizeVehicle));
+          setMapError("");
+        }
+      } catch (cause) {
+        if (active) {
+          setMapVehicles([]);
+          setMapError(cause instanceof Error ? cause.message : "Could not load matching vehicle locations.");
+        }
+      } finally {
+        if (active) setMapLoading(false);
+      }
+    };
+    void refreshMapPage();
+    if (!settings.realTimeAlerts) return () => { active = false; };
+    const timer = window.setInterval(() => void refreshMapPage(), 5000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [activeSection, demoSignedIn, healthFilter, mapOffset, settings.realTimeAlerts]);
 
   useEffect(() => {
     if (!demoSignedIn || !["overview", "fuel"].includes(activeSection)) return;
@@ -545,6 +590,14 @@ export default function App() {
       return matchesName && matchesStatus && matchesHealth;
     });
   }, [alerts, healthFilter, statusFilter, vehicleFilter, vehicles]);
+
+  const visibleMapVehicles = useMemo(() => {
+    const filter = vehicleFilter.trim().toLowerCase();
+    return mapVehicles.filter((vehicle) => !filter || vehicle.vehicle_id.toLowerCase().includes(filter) || displayVehicleId(vehicle.vehicle_id).toLowerCase().includes(filter));
+  }, [mapVehicles, vehicleFilter]);
+  const mapTotal = healthFilter === "healthy" ? overview.healthy_vehicles
+    : healthFilter === "warning" ? overview.warning_vehicles
+      : healthFilter === "critical" ? overview.critical_vehicles : overview.vehicles_seen;
 
   const visibleAlerts = useMemo(() => {
     const filter = alertSearch.trim().toLowerCase();
@@ -752,11 +805,12 @@ export default function App() {
           </section>
 
           <section className="fleet-map-view panel" aria-label="Fleet map and vehicle list">
-            <div className="fleet-map-heading"><div><h2>Live fleet map</h2><p>Click a vehicle marker or select a vehicle to open its details.</p></div><div className="map-status-legend"><span><i className="legend-green" />Moving</span><span><i className="legend-orange" />Idling</span><span><i className="legend-slate" />Engine off</span><span><i className="legend-gray" />Offline</span></div></div>
+            <div className="fleet-map-heading"><div><h2>Live fleet map</h2><p>Showing reported locations that match the selected health category.</p></div><div className="map-status-legend"><span><i className="legend-green" />Healthy</span><span><i className="legend-orange" />Warning</span><span><i className="legend-red" />Critical</span></div></div>
             <div className="health-filter-tabs" role="group" aria-label="Filter fleet by health">
-              {([ ["all", "All", overview.vehicles_seen], ["healthy", "Healthy", overview.healthy_vehicles], ["warning", "Warning", overview.warning_vehicles], ["critical", "Critical", overview.critical_vehicles] ] as const).map(([key, label, count]) => <button type="button" key={key} aria-pressed={healthFilter === key} className={`health-filter-tab health-filter-${key}${healthFilter === key ? " selected" : ""}`} onClick={() => setHealthFilter(key)}>{label}<span>{count.toLocaleString()}</span></button>)}
+              {([ ["all", "All", overview.vehicles_seen], ["healthy", "Healthy", overview.healthy_vehicles], ["warning", "Warning", overview.warning_vehicles], ["critical", "Critical", overview.critical_vehicles] ] as const).map(([key, label, count]) => <button type="button" key={key} aria-pressed={healthFilter === key} className={`health-filter-tab health-filter-${key}${healthFilter === key ? " selected" : ""}`} onClick={() => { setHealthFilter(key); setMapOffset(0); }}>{label}<span>{count.toLocaleString()}</span></button>)}
             </div>
-            <div className="fleet-map-layout"><FleetMap vehicles={settings.showLocations ? visibleVehicles : []} /><aside className="fleet-map-vehicle-list"><div className="map-list-heading"><strong>Vehicle list</strong><span>{visibleVehicles.length} shown</span></div><label className="map-search"><span aria-hidden="true">⌕</span><input value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)} placeholder="Search by vehicle ID" aria-label="Search map vehicles" /></label><div className="map-vehicle-scroll">{visibleVehicles.map((vehicle) => { const health = vehicleHealth(vehicle, alerts); return <button type="button" className="map-vehicle-row" key={vehicle.vehicle_id} onClick={() => { setSelectedVehicleId(vehicle.vehicle_id); setVehicleDetailTab("overview"); setActiveSection("vehicles"); window.location.hash = "vehicles"; }}><span className={`location-dot health-dot-${health}`} /><span className="map-vehicle-copy"><strong title={vehicle.vehicle_id}>{displayVehicleId(vehicle.vehicle_id)}</strong><small>{settings.showLocations ? `${vehicle.latitude.toFixed(3)}, ${vehicle.longitude.toFixed(3)}` : "Location hidden by settings"}</small></span><span className={`map-status-tag tag-${health}`}>{health}</span></button>; })}</div></aside></div>
+            {mapError && <div className="notice error" role="alert">Could not load map vehicles: {mapError}</div>}
+            <div className="fleet-map-layout"><FleetMap vehicles={settings.showLocations ? mapVehicles : []} /><aside className="fleet-map-vehicle-list"><div className="map-list-heading"><strong>Vehicle list</strong><span>{visibleMapVehicles.length} on page</span></div><label className="map-search"><span aria-hidden="true">⌕</span><input value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)} placeholder="Search vehicle IDs on this page" aria-label="Search map vehicles" /></label><div className="map-vehicle-scroll">{mapLoading && mapVehicles.length === 0 ? <div className="mini-empty">Loading matching vehicle locations…</div> : visibleMapVehicles.length === 0 ? <div className="mini-empty">No matching vehicle locations on this page.</div> : visibleMapVehicles.map((vehicle) => { const health = vehicle.health_status; return <button type="button" className="map-vehicle-row" key={vehicle.vehicle_id} onClick={() => { setSelectedVehicleId(vehicle.vehicle_id); setVehicleDetailTab("overview"); setActiveSection("vehicles"); window.location.hash = "vehicles"; }}><span className={`location-dot health-dot-${health}`} /><span className="map-vehicle-copy"><strong title={vehicle.vehicle_id}>{displayVehicleId(vehicle.vehicle_id)}</strong><small>{settings.showLocations ? `${vehicle.latitude.toFixed(3)}, ${vehicle.longitude.toFixed(3)}` : "Location hidden by settings"}</small></span><span className={`map-status-tag tag-${health}`}>{health}</span></button>; })}</div><div className="map-pagination"><span>{mapTotal.toLocaleString()} {healthFilter === "all" ? "vehicles" : `${healthFilter} vehicles`}</span><div><button type="button" disabled={mapOffset === 0 || mapLoading} onClick={() => setMapOffset((offset) => Math.max(0, offset - MAP_PAGE_SIZE))}>Previous</button><button type="button" disabled={mapLoading || mapOffset + MAP_PAGE_SIZE >= mapTotal} onClick={() => setMapOffset((offset) => offset + MAP_PAGE_SIZE)}>Next</button></div></div></aside></div>
           </section>
 
           <section className="alert-center panel" id="alerts" aria-labelledby="alert-center-title">
