@@ -9,11 +9,12 @@ export type MapVehicle = {
   longitude: number;
   speed_kmh: number;
   open_alert_count: number;
+  health_status: "healthy" | "warning" | "critical";
 };
 
 type Props = { vehicles: MapVehicle[] };
 
-const statusColor: Record<string, string> = { moving: "#11a77b", idling: "#e9952d", inactive: "#7b8ba4", offline: "#9aa6b7" };
+const healthColor: Record<string, string> = { healthy: "#11a77b", warning: "#e9952d", critical: "#df4f57" };
 const shortVehicleId = (value: string) => {
   const numberedId = value.match(/^vehicle-0*(\d+)$/i);
   if (numberedId) return `VH-${numberedId[1]}`;
@@ -54,7 +55,7 @@ export default function FleetMap({ vehicles }: Props) {
     });
     byLocation.forEach((group) => {
       const vehicle = group[0];
-      const color = statusColor[vehicle.status] ?? statusColor.offline;
+      const color = healthColor[vehicle.health_status] ?? healthColor.healthy;
       const isCluster = group.length > 1;
       const marker = L.marker([vehicle.latitude, vehicle.longitude], {
         icon: L.divIcon({
@@ -65,7 +66,7 @@ export default function FleetMap({ vehicles }: Props) {
           popupAnchor: isCluster ? [0, -17] : [0, -28],
         }),
         title: isCluster ? `${group.length} vehicles at this reported location` : vehicle.vehicle_id,
-        alt: isCluster ? `${group.length} vehicles share this reported location` : `${vehicle.vehicle_id}, ${vehicle.status}`,
+        alt: isCluster ? `${group.length} vehicles share this reported location` : `${vehicle.vehicle_id}, ${vehicle.health_status}`,
       });
       const popup = document.createElement("div");
       group.forEach((item) => {
