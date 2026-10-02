@@ -39,7 +39,7 @@ Docker is part of the deliverable. Compose defines the API, single-node local Ap
 
 The generator creates exactly 100,000 synthetic vehicle records and a base telemetry snapshot; the checked-in compressed dataset is described in [data/README.md](data/README.md), while generated uncompressed JSONL files are ignored by Git. A separate optional stream changes positions and speed at a configurable rate. This does not claim that the current API sustains the challenge's 100,000 events/second target.
 
-For a panel walkthrough, follow the [Panel Demo Guide](docs/PANEL_DEMO_GUIDE.md) for the exact page order, CSV export locations, architecture diagram, and evidence-safe performance wording. Track remaining work and evidence by priority in the [project checklist](docs/PROJECT_CHECKLIST.md). For new agents, the [handoff guide](docs/AGENT_HANDOFF.md) explains the project context and workflow.
+For the panel presentation, use the [Explainer Video Script](docs/EXPLAINER_VIDEO_SCRIPT.md) and [Panel Demo Guide](docs/PANEL_DEMO_GUIDE.md) for the speaking notes, page order, CSV export locations, architecture diagram, and evidence-safe performance wording. Track remaining work and evidence by priority in the [project checklist](docs/PROJECT_CHECKLIST.md). For new agents, the [handoff guide](docs/AGENT_HANDOFF.md) explains the project context and workflow.
 
 ## Quick start
 
