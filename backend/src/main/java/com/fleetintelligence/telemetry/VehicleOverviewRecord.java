@@ -11,5 +11,6 @@ public record VehicleOverviewRecord(
         BigDecimal latitude,
         BigDecimal longitude,
         BigDecimal speedKmh,
-        long openAlertCount) {
+        long openAlertCount,
+        String healthStatus) {
 }
