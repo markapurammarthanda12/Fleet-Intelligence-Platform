@@ -12,8 +12,9 @@ export type MapVehicle = {
   health_status: "healthy" | "warning" | "critical";
 };
 
-type Props = { vehicles: MapVehicle[] };
+type Props = { vehicles: MapVehicle[]; colorByHealth?: boolean };
 
+const statusColor: Record<string, string> = { moving: "#11a77b", idling: "#e9952d", inactive: "#7b8ba4", offline: "#9aa6b7" };
 const healthColor: Record<string, string> = { healthy: "#11a77b", warning: "#e9952d", critical: "#df4f57" };
 const shortVehicleId = (value: string) => {
   const numberedId = value.match(/^vehicle-0*(\d+)$/i);
@@ -21,7 +22,7 @@ const shortVehicleId = (value: string) => {
   return value.length > 20 ? `${value.slice(0, 12)}…${value.slice(-6)}` : value;
 };
 
-export default function FleetMap({ vehicles }: Props) {
+export default function FleetMap({ vehicles, colorByHealth = false }: Props) {
   const element = useRef<HTMLDivElement | null>(null);
   const map = useRef<L.Map | null>(null);
   const vehicleLayer = useRef<L.LayerGroup | null>(null);
@@ -55,7 +56,9 @@ export default function FleetMap({ vehicles }: Props) {
     });
     byLocation.forEach((group) => {
       const vehicle = group[0];
-      const color = healthColor[vehicle.health_status] ?? healthColor.healthy;
+      const color = colorByHealth
+        ? healthColor[vehicle.health_status] ?? healthColor.healthy
+        : statusColor[vehicle.status] ?? statusColor.offline;
       const isCluster = group.length > 1;
       const marker = L.marker([vehicle.latitude, vehicle.longitude], {
         icon: L.divIcon({
@@ -66,7 +69,7 @@ export default function FleetMap({ vehicles }: Props) {
           popupAnchor: isCluster ? [0, -17] : [0, -28],
         }),
         title: isCluster ? `${group.length} vehicles at this reported location` : vehicle.vehicle_id,
-        alt: isCluster ? `${group.length} vehicles share this reported location` : `${vehicle.vehicle_id}, ${vehicle.health_status}`,
+        alt: isCluster ? `${group.length} vehicles share this reported location` : `${vehicle.vehicle_id}, ${colorByHealth ? vehicle.health_status : vehicle.status}`,
       });
       const popup = document.createElement("div");
       group.forEach((item) => {
@@ -91,7 +94,7 @@ export default function FleetMap({ vehicles }: Props) {
     if (located.length > 1) currentMap.fitBounds(L.latLngBounds(located.map((vehicle): L.LatLngExpression => [vehicle.latitude, vehicle.longitude])), { padding: [42, 42], maxZoom: 14 });
     else if (located.length === 1) currentMap.setView([located[0].latitude, located[0].longitude], 14);
     window.setTimeout(() => currentMap.invalidateSize(), 60);
-  }, [vehicles]);
+  }, [colorByHealth, vehicles]);
 
   return <div className="fleet-map-frame"><div className="fleet-map-canvas" ref={element} aria-label="Interactive fleet vehicle map" /><div className="fleet-map-attribution-note">Vehicle locations are reported by telemetry. OpenStreetMap © contributors.</div></div>;
 }
